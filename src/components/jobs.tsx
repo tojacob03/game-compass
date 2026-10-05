@@ -151,10 +151,10 @@ export function JobControl({
               Abbrechen
             </button>
           </div>
-          <div className="h-1.5 overflow-hidden rounded bg-surface-2">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
             <div
-              className={`h-full rounded bg-accent transition-all duration-700 ${pct === null ? "w-1/3 animate-pulse" : ""}`}
-              style={pct !== null ? { width: `${Math.max(4, pct)}%` } : undefined}
+              className="h-full animate-shimmer rounded-full bg-[linear-gradient(90deg,var(--accent),#ffe2a8,var(--accent-2),var(--accent))] bg-[length:200%_100%] transition-[width] duration-700"
+              style={{ width: `${pct === null ? 35 : Math.max(4, pct)}%` }}
             />
           </div>
           {job.message && <p className="truncate text-xs text-muted">{job.message}</p>}

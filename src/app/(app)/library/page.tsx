@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AddGameForm } from "@/components/AddGameForm";
 import { GameCard, ScoreBadge } from "@/components/GameCard";
+import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
+import { Reveal } from "@/components/ui/Reveal";
 import { ENGAGEMENT_STYLE, engagementOf } from "@/lib/engagement";
 import { db, fetchAll, must, selectInChunks } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -73,23 +75,19 @@ export default async function Library(props: PageProps<"/library">) {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="h1">Bibliothek</h1>
-      <div className="flex flex-wrap items-center gap-2">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={`/library?tab=${t.id}`}
-            className={`rounded-full border px-3 py-1 text-sm ${tab === t.id ? "border-accent text-accent" : "border-line text-muted hover:text-text"}`}
-          >
-            {t.label}
-          </Link>
-        ))}
-        <form className="ml-auto" action="/library">
+    <Reveal className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="h1">Bibliothek</h1>
+        <form action="/library" className="w-full sm:w-64">
           <input type="hidden" name="tab" value={tab} />
-          <input name="q" defaultValue={q} className="input !w-56" placeholder="Suchen …" />
+          <input name="q" defaultValue={q} className="input" placeholder="Suchen …" />
         </form>
       </div>
+      <AnimatedTabs
+        id="library"
+        active={tab}
+        items={TABS.map((t) => ({ key: t.id, href: `/library?tab=${t.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`, label: t.label }))}
+      />
 
       {tab === "other" && <AddGameForm />}
       {tab === "family" && (
@@ -105,7 +103,7 @@ export default async function Library(props: PageProps<"/library">) {
       {rows.length === 0 ? (
         <p className="text-muted">Hier ist noch nichts.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
           {rows.map((r) => (
             <GameCard
               key={r.games.id}
@@ -117,7 +115,7 @@ export default async function Library(props: PageProps<"/library">) {
         </div>
       )}
       {rows.length >= LIMIT && <p className="text-xs text-muted">Zeige die ersten {LIMIT} – nutze die Suche für mehr.</p>}
-    </div>
+    </Reveal>
   );
 }
 

@@ -124,6 +124,42 @@ export async function getAppNames(appids: number[]): Promise<Map<number, string>
   return names;
 }
 
+export type SteamAssets = { appid: number; header: string | null; capsule: string | null; hero: string | null };
+
+/**
+ * Echte Bild-URLs aus dem Store (bis zu 100 Spiele pro Aufruf). Neuere Spiele haben Hash-Pfade –
+ * die früher übliche /apps/{id}/header.jpg-URL existiert dort nicht mehr.
+ */
+export async function getAssets(appids: number[]): Promise<SteamAssets[]> {
+  const out: SteamAssets[] = [];
+  const base = "https://shared.akamai.steamstatic.com/store_item_assets/";
+  for (let i = 0; i < appids.length; i += 100) {
+    const input = {
+      ids: appids.slice(i, i + 100).map((appid) => ({ appid })),
+      context: { language: "english", country_code: env().STEAM_COUNTRY },
+      data_request: { include_assets: true },
+    };
+    type Item = {
+      appid?: number;
+      id: number;
+      assets?: { asset_url_format?: string; header?: string; library_capsule?: string; library_hero?: string; main_capsule?: string };
+    };
+    try {
+      const data = await getJson<{ response: { store_items?: Item[] } }>(
+        `${API}/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`,
+      );
+      for (const it of data.response.store_items ?? []) {
+        const a = it.assets;
+        const url = (file?: string) => (a?.asset_url_format && file ? base + a.asset_url_format.replace("${FILENAME}", file) : null);
+        out.push({ appid: it.appid ?? it.id, header: url(a?.header) ?? url(a?.main_capsule), capsule: url(a?.library_capsule), hero: url(a?.library_hero) });
+      }
+    } catch (e) {
+      console.warn("Steam-Assets konnten nicht geladen werden", e);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Store-Daten, Reviews, Suche (öffentlich)
 // ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ export async function ensureMetadata(game: GameRow): Promise<GameRow> {
 
   const patch = {
     title: details?.name ?? game.title,
-    header_image: steamHeaderImage(appid),
+    header_image: details?.header_image ?? game.header_image ?? steamHeaderImage(appid),
     short_description: details?.short_description ? stripHtml(details.short_description) : game.short_description,
     about: details?.about_the_game ? stripHtml(details.about_the_game).slice(0, 3000) : game.about,
     genres: details?.genres?.map((g) => g.description) ?? game.genres,

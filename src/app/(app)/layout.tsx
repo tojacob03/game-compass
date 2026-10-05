@@ -25,11 +25,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <JobsProvider initial={jobs as Job[]}>
-    <div className="min-h-screen pb-20 md:pb-0">
-      <header className="sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur">
+    <div className="relative min-h-screen pb-24 md:pb-0">
+      <header className="sticky top-0 z-20 border-b border-line bg-bg/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <Link href="/dashboard" className="font-display text-lg font-semibold text-accent">
-            GameCompass
+          <Link href="/dashboard" className="flex items-center gap-2 font-display text-lg font-semibold">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-sm text-accent-ink shadow-[0_0_20px_-4px_var(--accent)]">
+              ◈
+            </span>
+            <span className="text-gradient">GameCompass</span>
           </Link>
           <NavLinks links={links} />
           <div className="ml-auto flex items-center gap-3">
@@ -47,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 md:py-8">{children}</main>
+      <main className="relative mx-auto max-w-6xl px-4 py-6 md:py-10">{children}</main>
       <MobileTabBar links={links} />
     </div>
     </JobsProvider>

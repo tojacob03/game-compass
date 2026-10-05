@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AnchorStrip } from "@/components/ModeCards";
+import { Reveal } from "@/components/ui/Reveal";
+import { BeamDot, TracingBeam } from "@/components/ui/TracingBeam";
 import { AboutMeForm, EvalRunner, RebuildProfileButton } from "@/components/ProfileActions";
 import { imagesForTitles } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
@@ -14,7 +16,7 @@ export default async function Profile() {
   const images = p ? await imagesForTitles(p.modes.flatMap((m) => m.anchors)) : new Map();
 
   return (
-    <div className="space-y-10">
+    <Reveal className="space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="h1">Mein Geschmack</h1>
@@ -37,10 +39,12 @@ export default async function Profile() {
             </p>
           </section>
 
-          <div className="space-y-6">
+          <TracingBeam>
+          <div className="space-y-8">
             {p.modes.map((m) => (
-              <section key={m.key} className="card overflow-hidden">
-                <div className="flex flex-wrap items-center gap-4 border-b border-line bg-surface-2/50 p-5">
+              <section key={m.key} className="card relative overflow-visible" data-reveal>
+                <BeamDot />
+                <div className="flex flex-wrap items-center gap-4 rounded-t-2xl border-b border-line bg-white/[0.02] p-5">
                   <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg text-3xl">{m.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <h2 className="font-display text-2xl font-semibold">{m.name}</h2>
@@ -97,6 +101,7 @@ export default async function Profile() {
               </section>
             ))}
           </div>
+          </TracingBeam>
 
           <div className="grid gap-4 md:grid-cols-3">
             <section className="card space-y-2 p-4">
@@ -145,6 +150,6 @@ export default async function Profile() {
         </p>
         <EvalRunner />
       </section>
-    </div>
+    </Reveal>
   );
 }

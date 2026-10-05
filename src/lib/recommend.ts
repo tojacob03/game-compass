@@ -1,4 +1,5 @@
 import "server-only";
+import { refreshMissingAssets } from "./assets";
 import { db, fetchAll, must } from "./db";
 import { enqueueAnalysis, upsertSteamGame } from "./games";
 import { cosine, generateJson, parsePgVector, toPgVector } from "./gemini";
@@ -254,6 +255,7 @@ export async function prepareRecommendations(user: UserRow, requestedMode: strin
   );
 
   const candidateIds = ids.filter((id) => !dropped.has(id));
+  await refreshMissingAssets(candidateIds).catch((e) => console.warn("Assets", e));
   const run = must(
     await db()
       .from("recommendation_runs")
@@ -462,7 +464,7 @@ export async function rankWishlist(userId: string) {
   const rows = must(
     await db()
       .from("user_games")
-      .select("game_id, games!inner(id, title, header_image, steam_appid, review_positive, review_negative, essence_embedding)")
+      .select("game_id, games!inner(id, title, header_image, capsule_image, steam_appid, review_positive, review_negative, essence_embedding)")
       .eq("user_id", userId)
       .eq("wishlisted", true),
     "wishlist.select",
@@ -471,6 +473,7 @@ export async function rankWishlist(userId: string) {
       id: string;
       title: string;
       header_image: string | null;
+      capsule_image: string | null;
       steam_appid: number | null;
       review_positive: number | null;
       review_negative: number | null;

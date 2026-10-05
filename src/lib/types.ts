@@ -32,6 +32,8 @@ export type GameRow = {
   analysis_attempts: number;
   created_by: string | null;
   median_playtime_minutes: number | null; // typische Spielzeit (KI-Schätzung)
+  capsule_image: string | null; // Hochformat-Cover
+  hero_image: string | null;
   chips: GameChips | null;
 };
 
@@ -58,7 +60,7 @@ export type UserGameRow = {
 
 /** Spalten, die für Listen reichen (ohne große Texte/Embeddings). */
 export const GAME_LIST_COLUMNS =
-  "id, steam_appid, title, header_image, short_description, genres, tags, release_year, review_positive, review_negative, analyzed_at, analysis_error";
+  "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, release_year, review_positive, review_negative, analyzed_at, analysis_error";
 
 export type GameListItem = Pick<
   GameRow,
@@ -66,6 +68,8 @@ export type GameListItem = Pick<
   | "steam_appid"
   | "title"
   | "header_image"
+  | "capsule_image"
+  | "hero_image"
   | "short_description"
   | "genres"
   | "tags"

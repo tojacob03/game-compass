@@ -1,4 +1,5 @@
 import "server-only";
+import { refreshMissingAssets } from "./assets";
 import { db, must } from "./db";
 import { enqueueAnalysis } from "./games";
 import { HttpError } from "./session";
@@ -53,6 +54,9 @@ export async function syncSteam(user: UserRow) {
       pending.map((g, i) => ({ gameId: g.id, priority: 50 - Math.min(i, 49) })),
     );
   }
+
+  // Echte Bild-URLs (Header, Hochformat-Cover, Hero) für alles, was noch keine hat – kostet keine KI
+  await refreshMissingAssets().catch((e) => console.warn("Assets", e));
 
   await db().from("taste_profiles").update({ stale: true }).eq("user_id", user.id);
   return { owned: owned.length, wishlist: wishlist.length };

@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ScoreBadge } from "@/components/GameCard";
 import { RatingForm } from "@/components/RatingForm";
+import { GameImage } from "@/components/ui/GameImage";
+import { ParallaxBackdrop } from "@/components/ui/ParallaxBackdrop";
+import { Reveal } from "@/components/ui/Reveal";
+import { SpotlightCard } from "@/components/ui/SpotlightCard";
 import { db } from "@/lib/db";
 import { wilson } from "@/lib/recommend";
 import { requireUser } from "@/lib/session";
@@ -16,7 +20,7 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
   const { data: g } = await db()
     .from("games")
     .select(
-      "id, steam_appid, title, header_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes",
+      "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes",
     )
     .eq("id", id)
     .maybeSingle();
@@ -36,11 +40,18 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
   const total = (game.review_positive ?? 0) + (game.review_negative ?? 0);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-      <div className="space-y-6">
-        {game.header_image && <img src={game.header_image} alt="" className="w-full rounded-xl border border-line" />}
-        <div className="space-y-2">
-          <h1 className="h1">{game.title}</h1>
+    <Reveal className="relative">
+      <ParallaxBackdrop src={game.hero_image ?? game.header_image} />
+      <div className="mb-10 flex flex-col gap-6 pt-4 sm:flex-row sm:items-end">
+        <GameImage
+          src={game.capsule_image ?? game.header_image}
+          fallbackSrc={game.header_image}
+          title={game.title}
+          priority
+          className="aspect-[2/3] w-40 shrink-0 rounded-2xl shadow-2xl shadow-black/70 ring-1 ring-white/15 sm:w-52"
+        />
+        <div className="min-w-0 space-y-3" data-reveal>
+          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">{game.title}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
             {game.release_year && <span>{game.release_year}</span>}
             {game.developers.length > 0 && <span>· {game.developers.join(", ")}</span>}
@@ -66,22 +77,25 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
             </div>
           )}
         </div>
+      </div>
 
+      <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+      <div className="space-y-6">
         {e ? (
-          <section className="card space-y-5 p-5">
+          <section className="card space-y-5 p-5" data-reveal>
             <div>
               <h2 className="h2">Essenz</h2>
               <p className="mt-1 text-muted">{e.summary}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {e.abstract_qualities.map((q) => (
-                <div key={q.name} className="rounded-lg border border-line bg-surface-2 p-3">
+              {e.abstract_qualities.map((q, qi) => (
+                <SpotlightCard key={q.name} className={`p-4 ${qi === 0 ? "sm:col-span-2" : ""}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{q.name}</span>
                     <span className="text-xs text-accent">{"●".repeat(q.strength)}{"○".repeat(5 - q.strength)}</span>
                   </div>
                   <p className="mt-1 text-sm text-muted">{q.description}</p>
-                </div>
+                </SpotlightCard>
               ))}
             </div>
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
@@ -135,7 +149,7 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
         )}
       </div>
 
-      <aside className="space-y-6">
+      <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
         <section className="card space-y-4 p-5">
           <div className="flex items-center justify-between">
             <h2 className="h2">Deine Meinung</h2>
@@ -175,6 +189,7 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
           </section>
         )}
       </aside>
-    </div>
+      </div>
+    </Reveal>
   );
 }

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { postJson } from "@/lib/client";
+import { GameImage } from "./ui/GameImage";
 import { Markdown } from "./Markdown";
 
 type Msg = { role: "user" | "model"; text: string; cards?: Card[] };
@@ -81,10 +83,16 @@ export default function Chat({ userName }: { userName: string }) {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 26 }}
+            className={m.role === "user" ? "flex justify-end" : ""}
+          >
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                m.role === "user" ? "bg-accent text-accent-ink" : "card"
+                m.role === "user" ? "bg-gradient-to-br from-accent to-[#ffcf7a] text-accent-ink shadow-[0_8px_30px_-12px_var(--accent)]" : "card"
               }`}
             >
               {m.role === "user" ? <p className="whitespace-pre-wrap">{m.text}</p> : <Markdown text={m.text} />}
@@ -92,16 +100,35 @@ export default function Chat({ userName }: { userName: string }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {m.cards.map((c) => (
                     <Link key={c.id} href={`/games/${c.id}`} className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 p-1.5 pr-3 text-xs hover:border-accent">
-                      {c.header_image && <img src={c.header_image} alt="" className="h-7 w-16 rounded object-cover" />}
+                      <GameImage src={c.header_image} title={c.title} className="h-7 w-16 rounded" />
                       {c.title}
                     </Link>
                   ))}
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         ))}
-        {busy && <div className="card inline-block px-4 py-3 text-sm text-muted">Compass denkt nach …</div>}
+        <AnimatePresence>
+          {busy && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="card inline-flex items-center gap-1.5 px-4 py-3"
+              aria-label="Compass denkt nach"
+            >
+              {[0, 1, 2].map((d) => (
+                <motion.span
+                  key={d}
+                  className="h-2 w-2 rounded-full bg-accent"
+                  animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 0.9, repeat: Infinity, delay: d * 0.15 }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div ref={bottom} />
       </div>
       {error && <p className="mb-2 text-sm text-bad">{error}</p>}

@@ -47,9 +47,10 @@ export async function latestRecommendations(userId: string, mode?: string | null
 }
 
 /** Titelbilder für Anker-Spiele (Titel -> Bild). */
-export async function imagesForTitles(titles: string[]): Promise<Map<string, { id: string; header_image: string | null }>> {
+export type TitleImage = { id: string; header_image: string | null; capsule_image: string | null };
+export async function imagesForTitles(titles: string[]): Promise<Map<string, TitleImage>> {
   const uniq = [...new Set(titles)].slice(0, 60);
   if (!uniq.length) return new Map();
-  const { data } = await db().from("games").select("id, title, header_image").in("title", uniq);
-  return new Map(((data ?? []) as { id: string; title: string; header_image: string | null }[]).map((g) => [g.title, g]));
+  const { data } = await db().from("games").select("id, title, header_image, capsule_image").in("title", uniq);
+  return new Map(((data ?? []) as (TitleImage & { title: string })[]).map((g) => [g.title, g]));
 }
