@@ -24,7 +24,8 @@ export async function POST(req: Request) {
         ),
       "rec_feedback.upsert",
     );
-    await markProfileStale(user.id);
+    // 👍/👎 wirkt sofort über die Such-Facetten; nur eine Begründung lohnt eine Profil-Neuberechnung
+    if (body.reason) await markProfileStale(user.id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

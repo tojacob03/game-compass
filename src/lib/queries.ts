@@ -25,6 +25,7 @@ export type LatestRec = {
   is_wildcard: boolean;
   via_family: boolean;
   mode_key: string | null;
+  similar_to: { game_id: string; title: string; sim: number }[];
   created_at: string;
   games: GameListItem;
 };
@@ -39,7 +40,7 @@ export async function latestRecommendations(userId: string, mode?: string | null
   return must(
     await db()
       .from("recommendations")
-      .select(`id, rank, fit, headline, why, risks, matched_drivers, is_wildcard, via_family, mode_key, created_at, games!inner(${GAME_LIST_COLUMNS})`)
+      .select(`id, rank, fit, headline, why, risks, matched_drivers, is_wildcard, via_family, mode_key, similar_to, created_at, games!inner(${GAME_LIST_COLUMNS})`)
       .eq("run_id", run.id)
       .order("rank"),
     "recommendations.latest",
@@ -53,4 +54,12 @@ export async function imagesForTitles(titles: string[]): Promise<Map<string, Tit
   if (!uniq.length) return new Map();
   const { data } = await db().from("games").select("id, title, header_image, capsule_image").in("title", uniq);
   return new Map(((data ?? []) as (TitleImage & { title: string })[]).map((g) => [g.title, g]));
+}
+
+/** Bilder für Spiel-IDs (id -> Bild). */
+export async function imagesForIds(ids: string[]): Promise<Map<string, TitleImage & { title: string }>> {
+  const uniq = [...new Set(ids)].slice(0, 100);
+  if (!uniq.length) return new Map();
+  const { data } = await db().from("games").select("id, title, header_image, capsule_image").in("id", uniq);
+  return new Map(((data ?? []) as (TitleImage & { title: string })[]).map((g) => [g.id, g]));
 }

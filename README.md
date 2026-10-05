@@ -29,6 +29,12 @@ in derselben Thematik. GameCompass setzt drei Ebenen tiefer an:
    den Wilson-Score). Danach gleicht die KI jeden Kandidaten gegen deine Aversionen ab. Ergebnis sind 10 Empfehlungen plus
    Wildcards, jeweils mit Begründung und ehrlichen Risiken.
 
+**Lernt mit:** 👍/👎 auf Empfehlungen verschiebt die Such-Facetten des jeweiligen Modus sofort (Rocchio-Verfahren auf
+zentrierten Vektoren – ohne KI-Aufruf). Im Profil lässt sich jeder Treiber und jede Abneigung mit ✓ bestätigen oder mit ✕
+streichen; das gilt sofort und bleibt beim Neuberechnen erhalten. Starke Abneigungen (No-Gos) brauchen einen Beleg in den
+eigenen negativen Angaben, sonst werden sie abgeschwächt. Kandidaten werden vor der teuren KI-Analyse über Tag-Paare,
+Review-Zahl und No-Go-Tags vorgefiltert. Zu jeder Empfehlung zeigt GameCompass die ähnlichsten eigenen Spiele.
+
 **Selbsttest** (Seite „Mein Geschmack“): Einige deiner Lieblingsspiele werden versteckt, das Profil wird ohne sie neu
 gebaut, und dann wird gemessen, wie weit oben sie unter fremden Spielen landen. Verglichen wird mit Tag-Matching und reiner
 Beliebtheit. So lässt sich „besser“ tatsächlich nachprüfen.

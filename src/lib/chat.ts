@@ -223,7 +223,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
           ),
         "rec_feedback.upsert",
       );
-      await markProfileStale(userId);
+      if (args.reason) await markProfileStale(userId);
       return { ok: true, saved: `${game.title}: ${verdict}` };
     }
     default:

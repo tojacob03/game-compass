@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ScoreBadge } from "@/components/GameCard";
 import { RatingForm } from "@/components/RatingForm";
+import { SimilarOwn } from "@/components/SimilarOwn";
+import { parsePgVector } from "@/lib/gemini";
+import { imagesForIds } from "@/lib/queries";
+import { similarOwnGames } from "@/lib/similar";
 import { GameImage } from "@/components/ui/GameImage";
 import { ParallaxBackdrop } from "@/components/ui/ParallaxBackdrop";
 import { Reveal } from "@/components/ui/Reveal";
@@ -20,12 +24,12 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
   const { data: g } = await db()
     .from("games")
     .select(
-      "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes",
+      "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes, essence_embedding",
     )
     .eq("id", id)
     .maybeSingle();
   if (!g) notFound();
-  const game = g as GameRow;
+  const game = g as unknown as GameRow;
 
   const [{ data: rel }, { data: fr }, { data: queued }] = await Promise.all([
     db().from("user_games").select("*").eq("user_id", user.id).eq("game_id", id).maybeSingle(),
@@ -37,6 +41,9 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
     (f) => f.game_id === id,
   );
   const e = game.essence;
+  const vec = parsePgVector((g as { essence_embedding?: unknown }).essence_embedding);
+  const similar = vec ? ((await similarOwnGames(user.id, [{ id: game.id, vector: vec }], 4, 0.12)).get(game.id) ?? []) : [];
+  const similarImages = await imagesForIds(similar.map((x) => x.game_id));
   const total = (game.review_positive ?? 0) + (game.review_negative ?? 0);
 
   return (
@@ -81,6 +88,11 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
 
       <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
       <div className="space-y-6">
+        {similar.length > 0 && (
+          <div data-reveal>
+            <SimilarOwn items={similar} images={similarImages} label="Fühlt sich ähnlich an wie dein" />
+          </div>
+        )}
         {e ? (
           <section className="card space-y-5 p-5" data-reveal>
             <div>

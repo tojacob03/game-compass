@@ -86,6 +86,9 @@ export const TasteProfileSchema = z.object({
     )
     .describe("Ein Eintrag pro Spielgruppe aus dem Prompt (Gruppen, die nur Rauschen sind, weglassen)"),
   global_aversions: z.array(AversionSchema).describe("Was in JEDEM Modus stört (echte No-Gos)"),
+  avoid_steam_tags: z
+    .array(z.string())
+    .describe("0-6 offizielle englische Steam-Tags, die zu echten, belegten No-Gos passen (z. B. 'Horror', 'Gacha', 'Sexual Content'). Leer, wenn nichts eindeutig."),
   open_questions: z.array(z.string()).describe("Was ist noch unklar? Max. 3 kurze Fragen"),
   exploration_edges: z.array(z.string()).describe("Richtungen, die die Person noch nicht kennt, aber mögen könnte"),
 });

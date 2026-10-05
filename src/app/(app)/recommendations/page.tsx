@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { FeedbackButtons } from "@/components/FeedbackButtons";
 import { RecommendationRunner } from "@/components/RecommendationRunner";
+import { SimilarOwn } from "@/components/SimilarOwn";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
 import { FitRing } from "@/components/ui/FitRing";
 import { GameImage } from "@/components/ui/GameImage";
 import { Reveal } from "@/components/ui/Reveal";
 import { SpotlightCard } from "@/components/ui/SpotlightCard";
 import { db } from "@/lib/db";
-import { latestRecommendations } from "@/lib/queries";
+import { imagesForIds, latestRecommendations } from "@/lib/queries";
 import { rankWishlist } from "@/lib/recommend";
 import { requireUser } from "@/lib/session";
 import { steamStoreUrl } from "@/lib/steam";
@@ -30,6 +31,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
     ? await db().from("rec_feedback").select("game_id, verdict").eq("user_id", user.id).in("game_id", recs.map((r) => r.games.id))
     : { data: [] };
   const verdicts = new Map(((fb ?? []) as { game_id: string; verdict: Verdict }[]).map((f) => [f.game_id, f.verdict]));
+  const similarImages = await imagesForIds(recs.flatMap((r) => (r.similar_to ?? []).map((x) => x.game_id)));
   const wish = (selected ? wishlist.filter((w) => w.modeKey === selected) : wishlist).slice(0, 10);
 
   return (
@@ -107,6 +109,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
                         <FitRing value={r.fit} size={54} className="shrink-0" />
                       </div>
                       <p className="font-medium">{r.headline}</p>
+                      <SimilarOwn items={r.similar_to ?? []} images={similarImages} />
                       <p className="text-sm leading-relaxed text-muted">{r.why}</p>
                       {r.risks && (
                         <p className="rounded-xl border border-bad/25 bg-bad/[0.06] px-3 py-2 text-sm">
