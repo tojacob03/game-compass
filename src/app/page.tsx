@@ -33,6 +33,7 @@ async function showcaseCovers(): Promise<Cover[]> {
       .select("id, title, capsule_image, header_image")
       .not("capsule_image", "is", null)
       .not("analyzed_at", "is", null)
+      .eq("is_software", false)
       .gt("review_positive", 2000)
       .order("review_positive", { ascending: false })
       .limit(28);
@@ -62,10 +63,10 @@ export default async function Home(props: PageProps<"/">) {
       <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 pb-10 pt-16 sm:pt-24">
         <div className="space-y-7">
           <p className="eyebrow">Spiele-Empfehlungen für dich und deine Freunde</p>
-          <SplitHeadline className="max-w-4xl font-display text-5xl font-medium leading-[1.0] tracking-[-0.035em] sm:text-[5.5rem]">
+          <SplitHeadline className="max-w-4xl text-balance font-display text-5xl font-medium leading-[1.02] tracking-[-0.025em] sm:text-[5.25rem]">
             Spiele, die dich packen – <span className="italic text-accent">weil</span> du verstehst, was dich packt.
           </SplitHeadline>
-          <p className="max-w-2xl text-lg text-muted">
+          <p className="max-w-2xl text-pretty text-lg text-muted">
             Verbinde Steam-Bibliothek, Wunschliste und Steam-Familie, bewerte mit einem Tipp – die KI findet heraus, was dich in
             welcher Stimmung wirklich antreibt.
           </p>

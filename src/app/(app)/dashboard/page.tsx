@@ -42,7 +42,7 @@ export default async function Today() {
             <p className="eyebrow">
               {date} — {greeting}, {user.display_name}
             </p>
-            <SplitHeadline className="font-display text-5xl font-medium leading-[1.02] tracking-[-0.03em] sm:text-6xl">
+            <SplitHeadline className="text-balance font-display text-5xl font-medium leading-[1.04] tracking-[-0.025em] sm:text-6xl">
               Worauf hast du <span className="italic text-accent">heute</span> Lust?
             </SplitHeadline>
           </div>

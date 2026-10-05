@@ -60,6 +60,7 @@ type LibRow = {
     essence_embedding: unknown;
     median_playtime_minutes: number | null;
     chips: GameChips | null;
+    is_software: boolean;
   };
 };
 
@@ -71,9 +72,10 @@ export async function loadLibrary(userId: string, opts: { excludeGameIds?: Set<s
       db()
         .from("user_games")
         .select(
-          "game_id, owned, manual, playtime_minutes, last_played_at, status, score, loved, disliked, liked_aspects, disliked_aspects, rate_skipped_at, games!inner(title, essence, essence_embedding, median_playtime_minutes, chips)",
+          "game_id, owned, manual, playtime_minutes, last_played_at, status, score, loved, disliked, liked_aspects, disliked_aspects, rate_skipped_at, games!inner(title, essence, essence_embedding, median_playtime_minutes, chips, is_software)",
         )
         .eq("user_id", userId)
+        .eq("games.is_software", false)
         .or("score.not.is.null,loved.not.is.null,disliked.not.is.null,playtime_minutes.gt.0,manual.eq.true")
         .order("game_id")
         .range(from, to) as unknown as PromiseLike<{ data: LibRow[] | null; error: { message: string } | null }>,

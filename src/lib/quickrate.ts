@@ -33,6 +33,7 @@ async function unratedRows(userId: string) {
         .from("user_games")
         .select("game_id, playtime_minutes, last_played_at, status, manual, platform, games!inner(title, header_image, median_playtime_minutes, chips)")
         .eq("user_id", userId)
+        .eq("games.is_software", false)
         .is("score", null)
         .is("rate_skipped_at", null)
         .or("playtime_minutes.gte.60,manual.eq.true")

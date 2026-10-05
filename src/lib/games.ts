@@ -115,9 +115,15 @@ export async function analyzeGame(gameId: string, userId: string): Promise<GameR
   let game = must(await db().from("games").select("*").eq("id", gameId).single(), "games.get") as GameRow;
   if (game.analyzed_at) return game;
 
-  await consumeAi(userId, 1, "analysis");
   try {
     game = await ensureMetadata(game);
+    const SOFTWARE = ["Utilities", "Design & Illustration", "Animation & Modeling", "Video Production", "Audio Production", "Software Training", "Web Publishing", "Game Development", "Photo Editing", "Accounting"];
+    if (game.genres.some((g) => SOFTWARE.includes(g)) || game.tags.slice(0, 8).some((t) => t === "Software" || t === "Utilities")) {
+      // Kein Spiel – KI-Analyse sparen; der Versuch zählt, damit die Warteschlange es überspringt
+      await db().from("games").update({ analysis_error: "Software, kein Spiel", analysis_attempts: 3 }).eq("id", game.id);
+      return game;
+    }
+    await consumeAi(userId, 1, "analysis");
     const [pos, neg] = game.steam_appid
       ? await Promise.all([getReviews(game.steam_appid, "positive", 8), getReviews(game.steam_appid, "negative", 6)])
       : [[], []];
