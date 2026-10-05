@@ -1,3 +1,4 @@
+import { ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
 import { AnalysisRunner } from "@/components/AnalysisRunner";
 import { GameCard } from "@/components/GameCard";
@@ -6,6 +7,7 @@ import { RebuildProfileButton } from "@/components/ProfileActions";
 import { SyncButton } from "@/components/SyncButton";
 import { Aurora } from "@/components/ui/Aurora";
 import { FitRing } from "@/components/ui/FitRing";
+import { Rail } from "@/components/ui/Rail";
 import { Reveal } from "@/components/ui/Reveal";
 import { SplitHeadline } from "@/components/ui/SplitHeadline";
 import { countUserGames, imagesForTitles, latestRecommendations, queueCount } from "@/lib/queries";
@@ -25,26 +27,29 @@ export default async function Today() {
     latestRecommendations(user.id),
   ]);
   const images = tp ? await imagesForTitles(tp.profile.modes.flatMap((m) => m.anchors)) : new Map();
-  const hour = Number(new Date().toLocaleString("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }));
-  const greeting = hour < 11 ? "Guten Morgen" : hour < 18 ? "Hi" : "Guten Abend";
+  const now = new Date();
+  const hour = Number(now.toLocaleString("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }));
+  const greeting = hour < 11 ? "Guten Morgen" : hour < 18 ? "Hallo" : "Guten Abend";
+  const date = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Berlin" });
 
   return (
-    <Reveal className="space-y-12">
-      <Aurora className="-top-24 h-[60vh]" intensity={0.55} />
+    <Reveal className="space-y-16">
+      <Aurora className="-top-24 h-[60vh]" />
 
-      <section className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted">
-              {greeting}, {user.display_name}
+      <section className="space-y-8">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="space-y-3">
+            <p className="eyebrow">
+              {date} — {greeting}, {user.display_name}
             </p>
-            <SplitHeadline className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Worauf hast du <span className="text-gradient">heute</span> Lust?
+            <SplitHeadline className="font-display text-5xl font-medium leading-[1.02] tracking-[-0.03em] sm:text-6xl">
+              Worauf hast du <span className="italic text-accent">heute</span> Lust?
             </SplitHeadline>
           </div>
           {tp?.stale && (
             <div className="w-full max-w-xs" data-reveal>
-              <RebuildProfileButton label="Profil mit neuen Bewertungen aktualisieren" />
+              <p className="label">Neue Bewertungen seit dem letzten Profil</p>
+              <RebuildProfileButton label="Profil aktualisieren" />
             </div>
           )}
         </div>
@@ -53,15 +58,15 @@ export default async function Today() {
           <ModeCards modes={tp.profile.modes} images={images} />
         ) : (
           <div className="card space-y-4 p-6" data-reveal>
-            <p className="text-muted">
-              Noch kein Geschmacksprofil. Am schnellsten: Steam synchronisieren, ein paar Spiele schnell bewerten – daraus erkennt
-              GameCompass deine Spielmodi.
+            <p className="max-w-xl text-muted">
+              Noch kein Geschmacksprofil. Am schnellsten geht&apos;s so: Steam synchronisieren, ein paar Spiele kurz bewerten –
+              daraus erkennt GameCompass deine Spielmodi.
             </p>
             <div className="flex flex-wrap items-start gap-3">
               {!user.last_synced_at && <SyncButton />}
               {user.last_synced_at && (
                 <Link href="/rate" className="btn-primary">
-                  ⚡ Schnell bewerten
+                  Schnell bewerten
                 </Link>
               )}
               {user.last_synced_at && <RebuildProfileButton label="Profil erstellen" />}
@@ -71,65 +76,66 @@ export default async function Today() {
       </section>
 
       {unrated > 0 && (
-        <Link
-          href="/rate"
-          data-reveal
-          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/[0.12] via-accent-2/[0.08] to-transparent p-4 transition hover:border-accent/60"
-        >
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent text-2xl text-accent-ink shadow-[0_0_30px_-6px_var(--accent)] transition group-hover:scale-110">
-            ⚡
+        <Link href="/rate" data-reveal className="group flex items-center gap-5 border-y border-line py-5 transition hover:border-line-strong">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition group-hover:scale-105">
+            <Zap size={18} strokeWidth={2} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="font-medium">{unrated} gespielte Spiele warten auf ein kurzes Urteil</div>
-            <div className="text-sm text-muted">Ein Tipp oder Swipe pro Spiel – schärft deine Modi am meisten.</div>
+            <div className="font-display text-xl font-medium">
+              <span className="tabular-nums">{unrated}</span> gespielte Spiele warten auf ein kurzes Urteil
+            </div>
+            <div className="text-sm text-muted">Ein Wisch pro Spiel – schärft deine Modi am meisten.</div>
           </div>
-          <span className="hidden text-sm text-accent transition group-hover:translate-x-1 sm:inline">Los →</span>
+          <ArrowRight size={18} className="shrink-0 text-muted transition group-hover:translate-x-1 group-hover:text-text" />
         </Link>
       )}
 
       {recs.length > 0 && (
-        <section className="space-y-4">
+        <section className="space-y-5">
           <div className="flex items-end justify-between" data-reveal>
-            <h2 className="h2">Zuletzt für dich gefunden</h2>
-            <Link href="/recommendations" className="text-sm text-accent">
-              Alle →
+            <div>
+              <p className="eyebrow">Zuletzt gefunden</p>
+              <h2 className="h2 mt-1">Für dich ausgesucht</h2>
+            </div>
+            <Link href="/recommendations" className="group inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-text">
+              Alle ansehen <ArrowRight size={14} className="transition group-hover:translate-x-0.5" />
             </Link>
           </div>
-          <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+          <Rail>
             {recs.slice(0, 10).map((r) => (
               <div key={r.id} className="w-40 shrink-0 snap-start sm:w-44">
                 <GameCard
                   game={r.games}
-                  badge={<FitRing value={r.fit} size={40} className="rounded-full bg-black/60 backdrop-blur" />}
+                  badge={<FitRing value={r.fit} size={38} className="rounded-full bg-black/70 backdrop-blur" />}
                   meta={<span className="line-clamp-2">{r.headline}</span>}
                 />
               </div>
             ))}
-          </div>
+          </Rail>
         </section>
       )}
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="card space-y-3 p-5" data-reveal>
+        <div className="card space-y-5 p-5" data-reveal>
           <div className="flex items-center justify-between gap-3">
-            <h2 className="h2">Bibliothek</h2>
-            <SyncButton label={user.last_synced_at ? "Neu syncen" : "Steam synchronisieren"} />
+            <p className="eyebrow">Bibliothek</p>
+            <SyncButton variant="ghost" label={user.last_synced_at ? "Neu synchronisieren" : "Steam synchronisieren"} />
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 divide-x divide-line">
             {[
               [owned, "auf Steam"],
               [wishlist, "Wunschliste"],
               [rated, "bewertet"],
             ].map(([n, l]) => (
-              <div key={l} className="rounded-xl bg-white/[0.03] py-3">
-                <div className="font-display text-2xl font-semibold tabular-nums">{n}</div>
-                <div className="text-xs text-muted">{l}</div>
+              <div key={l} className="px-4 first:pl-0">
+                <div className="font-display text-4xl font-medium tabular-nums tracking-tight">{n}</div>
+                <div className="mt-1 text-xs text-muted">{l}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="card space-y-3 p-5" data-reveal>
-          <h2 className="h2">KI-Analyse</h2>
+        <div className="card space-y-4 p-5" data-reveal>
+          <p className="eyebrow">KI-Analyse</p>
           <AnalysisRunner initialRemaining={queue} />
         </div>
       </section>

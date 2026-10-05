@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LayoutGroup, motion } from "motion/react";
 import { cn } from "@/lib/cn";
 
-export type TabItem = { key: string; href: string; label: string; icon?: string };
+export type TabItem = { key: string; href: string; label: string; index?: string };
 
 /** Tab-Leiste, deren Markierung weich zum aktiven Tab gleitet. */
 export function AnimatedTabs({ items, active, id, className }: { items: TabItem[]; active: string; id: string; className?: string }) {
@@ -26,11 +26,11 @@ export function AnimatedTabs({ items, active, id, className }: { items: TabItem[
               {on && (
                 <motion.span
                   layoutId="tab-pill"
-                  className="absolute inset-0 -z-10 rounded-full border border-accent/40 bg-accent/10"
+                  className="absolute inset-0 -z-10 rounded-full bg-white/[0.08] ring-1 ring-line-strong"
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
-              {t.icon && <span>{t.icon}</span>}
+              {t.index && <span className={cn("font-mono text-[10px]", on ? "text-accent" : "text-muted/70")}>{t.index}</span>}
               {t.label}
             </Link>
           );

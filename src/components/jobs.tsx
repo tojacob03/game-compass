@@ -153,7 +153,7 @@ export function JobControl({
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
             <div
-              className="h-full animate-shimmer rounded-full bg-[linear-gradient(90deg,var(--accent),#ffe2a8,var(--accent-2),var(--accent))] bg-[length:200%_100%] transition-[width] duration-700"
+              className="h-full animate-shimmer rounded-full bg-[linear-gradient(90deg,var(--accent)_0%,var(--accent)_40%,#ffc4ad_50%,var(--accent)_60%,var(--accent)_100%)] bg-[length:200%_100%] transition-[width] duration-700"
               style={{ width: `${pct === null ? 35 : Math.max(4, pct)}%` }}
             />
           </div>
@@ -161,7 +161,7 @@ export function JobControl({
           <p className="text-xs text-muted">Läuft auf dem Server weiter – du kannst die Seite wechseln oder schließen.</p>
         </div>
       )}
-      {!running && job?.status === "done" && job.stage && <p className="text-sm text-good">✓ {job.stage}</p>}
+      {!running && job?.status === "done" && job.stage && <p className="text-sm text-good">{job.stage}</p>}
       {!running && job?.status === "failed" && <p className="text-sm text-bad">{job.error ?? "Fehlgeschlagen"}</p>}
       {!running && !job && showIdleHint && <p className="text-xs text-muted">{showIdleHint}</p>}
       {error && <p className="text-sm text-bad">{error}</p>}
@@ -178,17 +178,20 @@ export function JobPill() {
   return (
     <Link
       href={KIND_HREF[j.kind]}
-      className="flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs text-accent"
+      className="hidden items-center gap-2 rounded-full border border-line-strong px-3 py-1 font-mono text-[11px] text-muted transition hover:text-text sm:flex"
       title={j.stage ?? ""}
     >
-      <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+      </span>
       {KIND_LABEL[j.kind]}
       {j.progress_total > 0 && (
-        <span className="text-accent/80">
+        <span className="tabular-nums text-text">
           {j.progress_done}/{j.progress_total}
         </span>
       )}
-      {active.length > 1 && <span className="text-accent/70">+{active.length - 1}</span>}
+      {active.length > 1 && <span>+{active.length - 1}</span>}
     </Link>
   );
 }

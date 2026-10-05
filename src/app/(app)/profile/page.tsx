@@ -51,11 +51,11 @@ export default async function Profile() {
               <section key={m.key} className="card relative overflow-visible" data-reveal>
                 <BeamDot />
                 <div className="flex flex-wrap items-center gap-4 rounded-t-2xl border-b border-line bg-white/[0.02] p-5">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg text-3xl">{m.emoji}</span>
+                  <span className="font-mono text-3xl font-light tabular-nums text-muted/60">{String(p.modes.indexOf(m) + 1).padStart(2, "0")}</span>
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-display text-2xl font-semibold">{m.name}</h2>
+                    <h2 className="font-display text-2xl font-medium tracking-[-0.01em]">{m.name}</h2>
                     <p className="text-muted">{m.tagline}</p>
-                    {m.when && <p className="mt-1 text-xs text-muted">🕒 {m.when}</p>}
+                    {m.when && <p className="mt-2 text-xs text-muted/80">{m.when}</p>}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <AnchorStrip titles={m.anchors} images={images} size="md" />

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { postJson } from "@/lib/client";
 
-export function SyncButton({ label = "Steam synchronisieren" }: { label?: string }) {
+export function SyncButton({ label = "Steam synchronisieren", variant = "primary" }: { label?: string; variant?: "primary" | "ghost" }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function SyncButton({ label = "Steam synchronisieren" }: { label?: string
 
   return (
     <div className="space-y-2">
-      <button className="btn-primary" onClick={sync} disabled={busy}>
+      <button className={variant === "ghost" ? "btn-ghost !px-3 !py-1.5 !text-xs" : "btn-primary"} onClick={sync} disabled={busy}>
         {busy ? "Synchronisiere …" : label}
       </button>
       {msg && <p className="text-sm text-muted">{msg}</p>}

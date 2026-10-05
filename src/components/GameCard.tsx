@@ -37,7 +37,7 @@ export function GameCard({
         className,
       )}
     >
-      <div className="relative overflow-hidden rounded-2xl ring-1 ring-white/10 transition duration-300 group-hover:shadow-[0_20px_50px_-20px_rgba(242,181,68,0.35)] group-hover:ring-white/25">
+      <div className="relative overflow-hidden rounded-2xl ring-1 ring-white/10 transition duration-300 group-hover:shadow-[0_24px_50px_-24px_rgba(0,0,0,0.9)] group-hover:ring-white/30">
         <GameImage
           src={poster ? (game.capsule_image ?? game.header_image) : game.header_image}
           fallbackSrc={poster ? game.header_image : game.capsule_image}
@@ -52,7 +52,7 @@ export function GameCard({
         )}
       </div>
       <div className="mt-2 px-0.5">
-        <div className="truncate text-sm font-medium transition group-hover:text-accent">{game.title}</div>
+        <div className="truncate text-sm transition group-hover:text-text text-text/90">{game.title}</div>
         {!poster && meta && <div className="mt-0.5 line-clamp-2 text-xs text-muted">{meta}</div>}
       </div>
     </Link>

@@ -1,4 +1,6 @@
+import { ArrowRight } from "lucide-react";
 import { redirect } from "next/navigation";
+import { Logo } from "@/components/ui/Logo";
 import { Aurora } from "@/components/ui/Aurora";
 import { GameImage } from "@/components/ui/GameImage";
 import { Marquee } from "@/components/ui/Marquee";
@@ -9,17 +11,14 @@ import { getSessionUser } from "@/lib/session";
 
 const PILLARS = [
   {
-    icon: "🧬",
     title: "Das Warum statt das Was",
     text: "Jedes Spiel wird aus Store-Text und echten Reviews auf seine Essenz destilliert – Fortschritt durch Wissen, melancholische Weite, Chaos mit Freunden. Genre ist zweitrangig.",
   },
   {
-    icon: "🎭",
     title: "Deine Spielmodi",
     text: "Abends Story, sonntags Soulslike, nebenbei Idle: GameCompass erkennt deine Modi automatisch – jeder mit eigenen Vorlieben und No-Gos.",
   },
   {
-    icon: "🎯",
     title: "Ehrliche Empfehlungen",
     text: "Mit Begründung in deinen Worten, Risiken, die dich stören könnten, und mutigen Wildcards aus ganz anderen Genres.",
   },
@@ -54,22 +53,25 @@ export default async function Home(props: PageProps<"/">) {
   return (
     <main className="relative isolate min-h-screen overflow-hidden">
       <Aurora />
-      <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 pb-10 pt-20 sm:pt-28">
-        <div className="space-y-6">
-          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-white/[0.04] px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-muted backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_var(--accent)]" />
-            GameCompass
-          </p>
-          <SplitHeadline className="max-w-4xl font-display text-5xl font-semibold leading-[1.02] tracking-tight sm:text-7xl">
-            Spiele, die dich packen – <span className="text-gradient">weil</span> du verstehst, was dich packt.
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-4 pt-6">
+        <Logo />
+        <a href="/api/auth/steam" className="text-sm text-muted transition hover:text-text">
+          Anmelden
+        </a>
+      </header>
+      <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 pb-10 pt-16 sm:pt-24">
+        <div className="space-y-7">
+          <p className="eyebrow">Spiele-Empfehlungen für dich und deine Freunde</p>
+          <SplitHeadline className="max-w-4xl font-display text-5xl font-medium leading-[1.0] tracking-[-0.035em] sm:text-[5.5rem]">
+            Spiele, die dich packen – <span className="italic text-accent">weil</span> du verstehst, was dich packt.
           </SplitHeadline>
           <p className="max-w-2xl text-lg text-muted">
             Verbinde Steam-Bibliothek, Wunschliste und Steam-Familie, bewerte mit einem Tipp – die KI findet heraus, was dich in
             welcher Stimmung wirklich antreibt.
           </p>
           <div className="flex flex-wrap items-center gap-4">
-            <a href="/api/auth/steam" className="btn-primary !rounded-2xl !px-6 !py-3 !text-base">
-              Mit Steam anmelden →
+            <a href="/api/auth/steam" className="btn-primary !px-6 !py-3 !text-base">
+              Mit Steam anmelden <ArrowRight size={16} />
             </a>
             <span className="text-xs text-muted">Kein Passwort bei uns – Login läuft direkt über Steam.</span>
           </div>
@@ -95,12 +97,12 @@ export default async function Home(props: PageProps<"/">) {
         </div>
       )}
 
-      <div className="mx-auto grid max-w-5xl gap-4 px-4 pb-24 pt-6 sm:grid-cols-3">
-        {PILLARS.map((p) => (
+      <div className="mx-auto grid max-w-5xl gap-4 px-4 pb-24 pt-10 sm:grid-cols-3">
+        {PILLARS.map((p, i) => (
           <SpotlightCard key={p.title} className="p-6">
-            <div className="mb-3 text-2xl">{p.icon}</div>
-            <h2 className="font-display text-lg font-semibold">{p.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{p.text}</p>
+            <p className="eyebrow">{String(i + 1).padStart(2, "0")}</p>
+            <h2 className="mt-6 font-display text-2xl font-medium leading-tight tracking-[-0.01em]">{p.title}</h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted">{p.text}</p>
           </SpotlightCard>
         ))}
       </div>

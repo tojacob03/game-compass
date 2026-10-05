@@ -23,7 +23,7 @@ export function TracingBeam({ children }: { children: React.ReactNode }) {
           gsap.fromTo(
             dot,
             { scale: 0.4, backgroundColor: "rgba(255,255,255,0.15)" },
-            { scale: 1, backgroundColor: "var(--accent)", boxShadow: "0 0 18px var(--accent)", scrollTrigger: { trigger: dot, start: "top 70%", toggleActions: "play none none reverse" } },
+            { scale: 1, backgroundColor: "var(--accent)", scrollTrigger: { trigger: dot, start: "top 70%", toggleActions: "play none none reverse" } },
           );
         });
       });
@@ -34,7 +34,7 @@ export function TracingBeam({ children }: { children: React.ReactNode }) {
   return (
     <div ref={ref} className="relative pl-6 sm:pl-10">
       <div aria-hidden className="absolute bottom-0 left-2 top-2 w-px bg-white/10 sm:left-4">
-        <div className="beam-fill h-full w-full origin-top bg-gradient-to-b from-accent via-accent-2 to-accent-3" />
+        <div className="beam-fill h-full w-full origin-top bg-accent" />
       </div>
       {children}
     </div>

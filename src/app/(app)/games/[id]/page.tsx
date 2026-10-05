@@ -194,8 +194,16 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
                   <span className="font-medium">{f.rater_name}</span>
                   <ScoreBadge score={f.score} />
                 </div>
-                {f.loved && <p className="text-muted">👍 {f.loved}</p>}
-                {f.disliked && <p className="text-muted">👎 {f.disliked}</p>}
+                {f.loved && (
+                  <p className="text-muted">
+                    <span className="text-good">+</span> {f.loved}
+                  </p>
+                )}
+                {f.disliked && (
+                  <p className="text-muted">
+                    <span className="text-bad">−</span> {f.disliked}
+                  </p>
+                )}
               </div>
             ))}
           </section>

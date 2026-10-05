@@ -1,19 +1,21 @@
 @import "tailwindcss";
 
+/*
+ * Redaktioneller Look: warmes Tinten-Schwarz, Papierweiß, EINE Akzentfarbe (Signal-Orange), sparsam.
+ * Hervorhebung über Typografie (Fraunces kursiv, Mono-Labels) statt über Verläufe und Glows.
+ */
 :root {
-  --bg: #0a0b10;
-  --surface: #12141c;
-  --surface-2: #1a1d29;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #ecebe6;
-  --muted: #8e95a8;
-  --accent: #f2b544;
-  --accent-ink: #1a1305;
-  --accent-2: #8b7bff;
-  --accent-3: #3ad6c5;
-  --good: #6fdc9b;
-  --bad: #ff7f86;
+  --bg: #0c0b0a;
+  --surface: #151412;
+  --surface-2: #1d1b18;
+  --border: rgba(255, 246, 230, 0.08);
+  --border-strong: rgba(255, 246, 230, 0.17);
+  --text: #eeeae1;
+  --muted: #9a958b;
+  --accent: #ff6a3d;
+  --accent-ink: #1c0a03;
+  --good: #8fcf8a;
+  --bad: #ec6a5e;
 }
 
 @theme inline {
@@ -26,22 +28,16 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
-  --color-accent-2: var(--accent-2);
-  --color-accent-3: var(--accent-3);
   --color-good: var(--good);
   --color-bad: var(--bad);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
-  --animate-aurora: aurora 18s ease-in-out infinite alternate;
+  --font-mono: var(--font-mono);
   --animate-marquee: marquee var(--marquee-duration, 60s) linear infinite;
-  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-drift: drift 22s ease-in-out infinite alternate;
 }
 
-@keyframes aurora {
-  0% { transform: translate3d(-8%, -6%, 0) rotate(0deg) scale(1); }
-  50% { transform: translate3d(6%, 4%, 0) rotate(8deg) scale(1.12); }
-  100% { transform: translate3d(-4%, 8%, 0) rotate(-6deg) scale(1.05); }
-}
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -49,6 +45,10 @@
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
+}
+@keyframes drift {
+  from { transform: translate3d(-3%, -2%, 0) scale(1); }
+  to { transform: translate3d(3%, 2%, 0) scale(1.06); }
 }
 
 html {
@@ -58,21 +58,22 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
+  font-feature-settings: "ss01", "cv11";
 }
 
-/* feines Filmkorn über allem – nimmt den "flachen" Look */
+/* feines Filmkorn – nimmt den flachen Digital-Look */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  opacity: 0.035;
+  opacity: 0.045;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  background: color-mix(in oklab, var(--accent) 40%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -87,33 +88,37 @@ body::after {
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-line bg-surface/80 backdrop-blur-sm;
-  }
-  .glass {
-    @apply border border-line bg-white/[0.03] backdrop-blur-xl;
+    @apply rounded-2xl border border-line bg-surface;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_30px_-10px_var(--accent)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-text px-5 py-2 text-sm font-medium text-bg transition hover:bg-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2 text-sm font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white/[0.03] px-4 py-2 text-sm font-medium text-text transition hover:border-line-strong hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-line-strong px-4 py-2 text-sm text-text transition hover:bg-white/[0.05] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
   }
   .input {
-    @apply w-full rounded-xl border border-line bg-black/30 px-3 py-2 text-sm text-text placeholder:text-muted/70 focus:border-accent/70 focus:ring-2 focus:ring-accent/20 focus:outline-none;
+    @apply w-full rounded-xl border border-line bg-black/20 px-3 py-2 text-sm text-text placeholder:text-muted/70 focus:border-line-strong focus:outline-none;
   }
   .label {
-    @apply mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted;
+    @apply mb-1.5 block font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-muted;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.04] px-2.5 py-0.5 text-xs text-muted;
+    @apply inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-0.5 text-xs text-muted;
   }
   .h1 {
-    @apply font-display text-3xl font-semibold tracking-tight sm:text-4xl;
+    @apply font-display text-4xl font-medium tracking-[-0.02em] sm:text-5xl;
   }
   .h2 {
-    @apply font-display text-xl font-semibold tracking-tight;
+    @apply font-display text-2xl font-medium tracking-[-0.01em];
   }
-  .text-gradient {
-    @apply bg-gradient-to-r from-accent via-[#ffd99a] to-accent-2 bg-clip-text text-transparent;
+  /* Hervorhebung im Fließtext/Überschriften: kursiv statt Farbverlauf */
+  .em {
+    @apply font-display italic text-accent;
   }
 }

@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 export function SpotlightCard({
   children,
   className,
-  color = "rgba(242,181,68,0.14)",
+  color = "rgba(255,246,230,0.07)",
 }: {
   children: React.ReactNode;
   className?: string;
@@ -17,7 +17,7 @@ export function SpotlightCard({
   const y = useMotionValue(-400);
   const reduce = useReducedMotion();
   const glow = useMotionTemplate`radial-gradient(420px circle at ${x}px ${y}px, ${color}, transparent 70%)`;
-  const ring = useMotionTemplate`radial-gradient(260px circle at ${x}px ${y}px, rgba(255,255,255,0.22), transparent 70%)`;
+  const ring = useMotionTemplate`radial-gradient(260px circle at ${x}px ${y}px, rgba(255,246,230,0.28), transparent 70%)`;
 
   return (
     <div

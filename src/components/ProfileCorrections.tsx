@@ -74,7 +74,7 @@ export function RejectedList({ items }: { items: (Item & { modeLabel: string })[
               className="chip line-through decoration-bad/60 hover:no-underline hover:text-text"
               title="Wiederherstellen"
             >
-              {i.kind === "driver" ? "Treiber" : "Abneigung"}: {i.name} · {i.modeLabel} ↺
+              {i.kind === "driver" ? "Treiber" : "Abneigung"}: {i.name} · {i.modeLabel} · wiederherstellen
             </motion.button>
           ))}
         </AnimatePresence>

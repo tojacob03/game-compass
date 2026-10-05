@@ -37,16 +37,8 @@ export default async function Discover(props: PageProps<"/recommendations">) {
   return (
     <Reveal className="space-y-8">
       <div className="space-y-2">
-        <h1 className="h1">
-          {current ? (
-            <>
-              <span className="mr-2">{current.emoji}</span>
-              {current.name}
-            </>
-          ) : (
-            "Entdecken"
-          )}
-        </h1>
+        <p className="eyebrow">{current ? `Modus ${String(modes.indexOf(current) + 1).padStart(2, "0")}` : "Entdecken"}</p>
+        <h1 className="h1">{current ? current.name : <>Neues, das zu dir <span className="italic text-accent">passt</span></>}</h1>
         <p className="max-w-3xl text-muted">{current ? current.tagline : "Neue Spiele – ausgewählt nach dem, was dich im jeweiligen Modus wirklich antreibt."}</p>
       </div>
 
@@ -55,8 +47,8 @@ export default async function Discover(props: PageProps<"/recommendations">) {
           id="modes"
           active={selected ?? "mix"}
           items={[
-            { key: "mix", href: "/recommendations?mode=mix", label: "Mix", icon: "🎲" },
-            ...modes.map((m) => ({ key: m.key, href: `/recommendations?mode=${encodeURIComponent(m.key)}`, label: m.name, icon: m.emoji })),
+            { key: "mix", href: "/recommendations?mode=mix", label: "Mix", index: "00" },
+            ...modes.map((m, i) => ({ key: m.key, href: `/recommendations?mode=${encodeURIComponent(m.key)}`, label: m.name, index: String(i + 1).padStart(2, "0") })),
           ]}
         />
       )}
@@ -94,13 +86,9 @@ export default async function Discover(props: PageProps<"/recommendations">) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-1.5">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {!selected && mode && (
-                              <span className="chip">
-                                {mode.emoji} {mode.name}
-                              </span>
-                            )}
-                            {r.is_wildcard && <span className="chip !border-accent-2/50 !text-accent-2">✦ Wildcard</span>}
-                            {r.via_family && <span className="chip !border-good/50 !text-good">In deiner Steam-Familie</span>}
+                            {!selected && mode && <span className="eyebrow">{mode.name}</span>}
+                            {r.is_wildcard && <span className="chip !border-accent/50 !text-accent">Wildcard</span>}
+                            {r.via_family && <span className="chip !border-good/40 !text-good">In deiner Steam-Familie</span>}
                           </div>
                           <Link href={`/games/${r.games.id}`} className="block font-display text-2xl font-semibold leading-tight hover:text-accent">
                             {r.games.title}
@@ -156,14 +144,12 @@ export default async function Discover(props: PageProps<"/recommendations">) {
             {wish.map((w, i) => (
               <li key={w.game.id} data-reveal>
                 <Link href={`/games/${w.game.id}`} className="group flex items-center gap-3 rounded-xl border border-line bg-white/[0.02] p-2 pr-3 transition hover:border-line-strong hover:bg-white/[0.05]">
-                  <span className="w-6 text-right font-display text-lg text-muted tabular-nums">{i + 1}</span>
+                  <span className="w-6 text-right font-mono text-xs text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>
                   <GameImage src={w.game.capsule_image} fallbackSrc={w.game.header_image} title={w.game.title} className="h-16 w-11 shrink-0 rounded-md ring-1 ring-white/10" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium transition group-hover:text-accent">{w.game.title}</div>
                     {!current && w.modeKey && modeByKey.get(w.modeKey) && (
-                      <div className="truncate text-xs text-muted">
-                        {modeByKey.get(w.modeKey)!.emoji} {modeByKey.get(w.modeKey)!.name}
-                      </div>
+                      <div className="truncate text-xs text-muted">{modeByKey.get(w.modeKey)!.name}</div>
                     )}
                   </div>
                 </Link>

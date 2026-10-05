@@ -4,6 +4,7 @@ import { driveJob, listJobs, staleJobs } from "@/lib/jobs";
 import { countUnrated } from "@/lib/quickrate";
 import { after } from "next/server";
 import { requireUser } from "@/lib/session";
+import { Logo } from "@/components/ui/Logo";
 import { MobileTabBar, NavLinks, type NavItem } from "./NavLinks";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -13,39 +14,38 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const stale = staleJobs(jobs);
   if (stale.length) after(() => Promise.all(stale.map((j) => driveJob(j.id))));
   const links: NavItem[] = [
-    { href: "/dashboard", label: "Heute", icon: "🧭", primary: true },
-    { href: "/recommendations", label: "Entdecken", icon: "✨", primary: true },
-    { href: "/rate", label: "Bewerten", icon: "⚡", primary: true, badge: unrated },
-    { href: "/chat", label: "Chat", icon: "💬", primary: true },
-    { href: "/library", label: "Bibliothek", icon: "📚", primary: true },
-    { href: "/profile", label: "Mein Geschmack", icon: "🧬" },
-    { href: "/groups", label: "Gruppen", icon: "👥" },
-    ...(user.is_admin ? [{ href: "/admin", label: "Admin", icon: "🛠" }] : []),
+    { href: "/dashboard", label: "Heute", icon: "today", primary: true },
+    { href: "/recommendations", label: "Entdecken", icon: "discover", primary: true },
+    { href: "/rate", label: "Bewerten", icon: "rate", primary: true, badge: unrated },
+    { href: "/chat", label: "Chat", icon: "chat", primary: true },
+    { href: "/library", label: "Bibliothek", icon: "library", primary: true },
+    { href: "/profile", label: "Geschmack", icon: "profile" },
+    { href: "/groups", label: "Gruppen", icon: "groups" },
+    ...(user.is_admin ? [{ href: "/admin", label: "Admin", icon: "admin" as const }] : []),
   ];
 
   return (
     <JobsProvider initial={jobs as Job[]}>
     <div className="relative min-h-screen pb-24 md:pb-0">
-      <header className="sticky top-0 z-20 border-b border-line bg-bg/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <Link href="/dashboard" className="flex items-center gap-2 font-display text-lg font-semibold">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-sm text-accent-ink shadow-[0_0_20px_-4px_var(--accent)]">
-              ◈
-            </span>
-            <span className="text-gradient">GameCompass</span>
+      <header className="sticky top-0 z-20 border-b border-line bg-bg/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3.5">
+          <Link href="/dashboard" className="shrink-0 text-text">
+            <Logo />
           </Link>
           <NavLinks links={links} />
           <div className="ml-auto flex items-center gap-3">
             <JobPill />
             <Link href="/profile" className="text-xs text-muted hover:text-text md:hidden">
-              Profil
+              Geschmack
             </Link>
             <Link href="/groups" className="text-xs text-muted hover:text-text md:hidden">
               Gruppen
             </Link>
-            {user.avatar_url && <img src={user.avatar_url} alt="" className="h-7 w-7 rounded-full ring-1 ring-line" />}
+            {user.avatar_url && <img src={user.avatar_url} alt="" title={user.display_name} className="h-7 w-7 rounded-full ring-1 ring-line-strong" />}
             <form action="/api/auth/logout" method="post">
-              <button className="text-xs text-muted hover:text-text">Abmelden</button>
+              <button className="text-xs text-muted transition hover:text-text" title="Abmelden">
+                Abmelden
+              </button>
             </form>
           </div>
         </div>

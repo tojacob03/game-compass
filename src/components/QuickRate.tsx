@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Heart, Meh, ThumbsDown, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,11 +12,11 @@ import { GameImage } from "./ui/GameImage";
 type Verdict = "love" | "good" | "meh" | "bad" | "skip";
 type Tone = "liked" | "disliked";
 
-const VERDICTS: { v: Verdict; emoji: string; label: string; key: string }[] = [
-  { v: "love", emoji: "❤️", label: "Liebe ich", key: "1" },
-  { v: "good", emoji: "👍", label: "Gut", key: "2" },
-  { v: "meh", emoji: "😐", label: "Meh", key: "3" },
-  { v: "bad", emoji: "👎", label: "Nicht meins", key: "4" },
+const VERDICTS: { v: Verdict; Icon: typeof Heart; label: string; key: string }[] = [
+  { v: "love", Icon: Heart, label: "Liebe ich", key: "1" },
+  { v: "good", Icon: ThumbsUp, label: "Gut", key: "2" },
+  { v: "meh", Icon: Meh, label: "Meh", key: "3" },
+  { v: "bad", Icon: ThumbsDown, label: "Nicht meins", key: "4" },
 ];
 
 /** Richtung, in die eine Karte nach dem Urteil herausfliegt. */
@@ -137,8 +138,13 @@ export function QuickRate() {
   if (!card) {
     return (
       <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="card mx-auto max-w-lg space-y-4 p-8 text-center">
-        <motion.div initial={{ rotate: -20, scale: 0.6 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 200 }} className="text-6xl">
-          🎉
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 220 }}
+          className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-accent text-accent-ink"
+        >
+          <Check size={26} strokeWidth={2.2} />
         </motion.div>
         <h2 className="h2">{done ? `${done} Spiele bewertet – stark!` : "Alles bewertet"}</h2>
         <p className="text-muted">
@@ -165,11 +171,11 @@ export function QuickRate() {
         <span>
           {done > 0 ? `${done} erledigt · ` : ""}noch {Math.max(0, remaining - index)} offen
         </span>
-        <span className="hidden sm:inline">Wischen oder ←/→/↑ · Tippen für Details</span>
+        <span className="hidden font-mono text-[11px] sm:inline">← nö · ↑ liebe · gut →</span>
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2"
+          className="h-full rounded-full bg-accent"
           animate={{ width: `${((index + (verdict ? 0.5 : 0)) / Math.max(1, cards.length)) * 100}%` }}
           transition={{ type: "spring", stiffness: 120, damping: 20 }}
         />
@@ -200,10 +206,10 @@ export function QuickRate() {
                     whileTap={{ scale: 0.92 }}
                     onClick={() => setVerdict(x.v)}
                     className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-3 text-xs transition ${
-                      verdict === x.v ? "border-accent bg-accent/10 text-text shadow-[0_0_24px_-8px_var(--accent)]" : "border-line bg-white/[0.03] text-muted hover:border-line-strong hover:text-text"
+                      verdict === x.v ? "border-text/50 bg-white/[0.06] text-text" : "border-line text-muted hover:border-line-strong hover:text-text"
                     }`}
                   >
-                    <span className="text-2xl">{x.emoji}</span>
+                    <x.Icon size={22} strokeWidth={1.6} className={verdict === x.v ? "text-accent" : ""} fill={verdict === x.v && x.v === "love" ? "currentColor" : "none"} />
                     {x.label}
                   </motion.button>
                 ))}
@@ -308,14 +314,14 @@ function SwipeCard({
           <h2 className="font-display text-2xl font-semibold text-white">{card.title}</h2>
           <p className="text-sm text-white/75">{card.hint}</p>
         </div>
-        <motion.span style={{ opacity: likeOpacity }} className="absolute left-4 top-4 -rotate-12 rounded-lg border-2 border-good px-3 py-1 text-lg font-black tracking-wider text-good">
-          GUT 👍
+        <motion.span style={{ opacity: likeOpacity }} className="absolute left-4 top-4 -rotate-12 rounded-md border-2 border-good px-3 py-0.5 font-mono text-sm font-semibold uppercase tracking-[0.2em] text-good">
+          Gut
         </motion.span>
-        <motion.span style={{ opacity: nopeOpacity }} className="absolute right-4 top-4 rotate-12 rounded-lg border-2 border-bad px-3 py-1 text-lg font-black tracking-wider text-bad">
-          NÖ 👎
+        <motion.span style={{ opacity: nopeOpacity }} className="absolute right-4 top-4 rotate-12 rounded-md border-2 border-bad px-3 py-0.5 font-mono text-sm font-semibold uppercase tracking-[0.2em] text-bad">
+          Nö
         </motion.span>
-        <motion.span style={{ opacity: loveOpacity }} className="absolute left-1/2 top-4 -translate-x-1/2 rounded-lg border-2 border-accent px-3 py-1 text-lg font-black tracking-wider text-accent">
-          LIEBE ❤️
+        <motion.span style={{ opacity: loveOpacity }} className="absolute left-1/2 top-4 -translate-x-1/2 rounded-md border-2 border-accent px-3 py-0.5 font-mono text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+          Liebe
         </motion.span>
       </div>
       {children}

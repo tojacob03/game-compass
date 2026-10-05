@@ -1,5 +1,6 @@
 "use client";
 
+import { ThumbsDown, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { postJson } from "@/lib/client";
@@ -38,16 +39,16 @@ export function FeedbackButtons({ gameId, initial }: { gameId: string; initial: 
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         <button
-          className={`btn-ghost !px-3 !py-1.5 ${verdict === "interested" ? "!border-good !text-good" : ""}`}
+          className={`btn-ghost !px-3 !py-1.5 !text-xs ${verdict === "interested" ? "!border-good/60 !text-good" : ""}`}
           disabled={busy}
           onClick={() => send("interested")}
         >
-          👍 Klingt gut
+          <ThumbsUp size={14} strokeWidth={1.8} /> Klingt gut
         </button>
-        <button className="btn-ghost !px-3 !py-1.5" disabled={busy} onClick={() => setAskReason(true)}>
-          👎 Eher nicht
+        <button className="btn-ghost !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => setAskReason(true)}>
+          <ThumbsDown size={14} strokeWidth={1.8} /> Eher nicht
         </button>
-        <button className="btn-ghost !px-3 !py-1.5" disabled={busy} onClick={() => send("already_played")}>
+        <button className="btn-ghost !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => send("already_played")}>
           Schon gespielt
         </button>
       </div>

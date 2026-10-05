@@ -92,7 +92,7 @@ export default function Chat({ userName }: { userName: string }) {
           >
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                m.role === "user" ? "bg-gradient-to-br from-accent to-[#ffcf7a] text-accent-ink shadow-[0_8px_30px_-12px_var(--accent)]" : "card"
+                m.role === "user" ? "bg-text text-bg" : "card"
               }`}
             >
               {m.role === "user" ? <p className="whitespace-pre-wrap">{m.text}</p> : <Markdown text={m.text} />}
