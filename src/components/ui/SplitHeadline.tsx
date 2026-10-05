@@ -16,7 +16,7 @@ export function SplitHeadline({ children, className, as: Tag = "h1" }: { childre
       if (!ref.current) return;
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const split = SplitText.create(ref.current!, { type: "words", mask: "words" });
+        const split = SplitText.create(ref.current!, { type: "words", mask: "words", wordsClass: "split-word" });
         gsap.from(split.words, { yPercent: 110, opacity: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 });
         return () => split.revert();
       });

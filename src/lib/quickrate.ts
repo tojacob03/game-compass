@@ -43,8 +43,17 @@ async function unratedRows(userId: string) {
   );
 }
 
+/** Nur zählen (Header-Badge auf jeder Seite) – ohne die Zeilen zu übertragen. */
 export async function countUnrated(userId: string) {
-  return (await unratedRows(userId)).length;
+  const { count } = await db()
+    .from("user_games")
+    .select("game_id, games!inner(is_software)", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("games.is_software", false)
+    .is("score", null)
+    .is("rate_skipped_at", null)
+    .or("playtime_minutes.gte.60,manual.eq.true");
+  return count ?? 0;
 }
 
 /**

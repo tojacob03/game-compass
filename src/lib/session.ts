@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "./env";
@@ -31,8 +32,8 @@ export const sessionCookieOptions = {
   maxAge: SESSION_DAYS * 24 * 60 * 60,
 };
 
-/** Liefert den eingeloggten Nutzer (egal welcher Status) oder null. */
-export async function getSessionUser(): Promise<UserRow | null> {
+/** Liefert den eingeloggten Nutzer (egal welcher Status) oder null. Pro Request nur einmal abgefragt (Layout + Seite). */
+export const getSessionUser = cache(async (): Promise<UserRow | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
@@ -43,7 +44,7 @@ export async function getSessionUser(): Promise<UserRow | null> {
   } catch {
     return null;
   }
-}
+});
 
 /** Für Seiten: leitet um, wenn nicht eingeloggt oder (noch) nicht freigeschaltet. */
 export async function requireUser(): Promise<UserRow> {

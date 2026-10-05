@@ -597,37 +597,42 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
   return { runId, count: recs.length };
 }
 
-/** Wunschliste nach Passung sortieren (nur Vektoren, keine KI-Kosten). */
+/** Wunschliste nach Passung sortieren (Ähnlichkeit wird in der DB berechnet, keine KI-Kosten). */
 export async function rankWishlist(userId: string) {
   const intents = await loadIntents(userId);
   if (!intents.length) return [];
-  const rows = must(
+  const ranked = must(
+    await db().rpc("rank_wishlist", {
+      p_user: userId,
+      p_queries: intents.map((i) => toPgVector(i.vector)),
+      p_weights: intents.map((i) => i.weight),
+    }),
+    "rank_wishlist",
+  ) as { game_id: string; best_idx: number; best_sim: number }[];
+  if (!ranked.length) return [];
+  const games = must(
     await db()
-      .from("user_games")
-      .select("game_id, games!inner(id, title, header_image, capsule_image, steam_appid, review_positive, review_negative, essence_embedding)")
-      .eq("user_id", userId)
-      .eq("wishlisted", true),
-    "wishlist.select",
-  ) as unknown as {
-    games: {
-      id: string;
-      title: string;
-      header_image: string | null;
-      capsule_image: string | null;
-      steam_appid: number | null;
-      review_positive: number | null;
-      review_negative: number | null;
-      essence_embedding: unknown;
-    };
+      .from("games")
+      .select("id, title, header_image, capsule_image, steam_appid, review_positive, review_negative")
+      .in("id", ranked.map((r) => r.game_id)),
+    "wishlist.games",
+  ) as {
+    id: string;
+    title: string;
+    header_image: string | null;
+    capsule_image: string | null;
+    steam_appid: number | null;
+    review_positive: number | null;
+    review_negative: number | null;
   }[];
-  return rows
-    .filter((r) => r.games.essence_embedding)
+  const byId = new Map(games.map((g) => [g.id, g]));
+  return ranked
+    .filter((r) => byId.has(r.game_id))
     .map((r) => {
-      const v = parsePgVector(r.games.essence_embedding)!;
-      const s = scoreCandidate(v, intents, wilson(r.games.review_positive, r.games.review_negative));
-      const { essence_embedding: _ignored, ...game } = r.games;
-      void _ignored;
-      return { game, ...s };
+      const game = byId.get(r.game_id)!;
+      const intent = intents[r.best_idx - 1];
+      const q = wilson(game.review_positive, game.review_negative) ?? 0.75;
+      return { game, score: r.best_sim + 0.08 * (q - 0.75), bestIntent: intent?.label ?? "", modeKey: intent?.mode_key ?? null };
     })
     .sort((a, b) => b.score - a.score);
 }
