@@ -44,3 +44,4 @@ next-env.d.ts
 # lokale Test-Hilfsdateien
 .stub-server-only.ts
 .tsconfig.test.json
+.*.mts
