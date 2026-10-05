@@ -21,7 +21,11 @@ let cached: z.infer<typeof schema> | null = null;
 
 export function env() {
   if (!cached) {
-    const parsed = schema.safeParse(process.env);
+    // Die Vercel-Supabase-Integration setzt SUPABASE_SERVICE_ROLE_KEY statt SUPABASE_SECRET_KEY – beides akzeptieren
+    const parsed = schema.safeParse({
+      ...process.env,
+      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
     if (!parsed.success) {
       const missing = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
       throw new Error(`Ungültige oder fehlende Umgebungsvariablen: ${missing}`);
