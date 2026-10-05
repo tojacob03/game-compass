@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0d0f14;
+  --surface: #151821;
+  --surface-2: #1c2030;
+  --border: #272c3d;
+  --text: #e8e6e1;
+  --muted: #9097a8;
+  --accent: #f0b450;
+  --accent-ink: #1a1305;
+  --good: #6fcf97;
+  --bad: #ef7d7d;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-accent text-accent-ink hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 border border-line bg-surface-2 text-text hover:border-muted;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-text placeholder:text-muted/70 focus:border-accent focus:outline-none;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs text-muted;
+  }
+  .h1 {
+    @apply font-display text-3xl font-semibold tracking-tight;
+  }
+  .h2 {
+    @apply font-display text-xl font-semibold tracking-tight;
+  }
+}
