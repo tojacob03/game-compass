@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleApiError } from "@/lib/api";
-import { removeCorrection, setCorrection } from "@/lib/corrections";
+import { removeCorrection, setCorrection, setWeight } from "@/lib/corrections";
 import { db, must } from "@/lib/db";
 import { requireApiUser } from "@/lib/session";
 import { markProfileStale } from "@/lib/taste";
@@ -16,6 +16,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("about"), aboutMe: z.string().trim().max(3000) }),
   z.object({ action: z.literal("correct"), ...Item, verdict: z.enum(["confirm", "reject"]) }),
   z.object({ action: z.literal("uncorrect"), ...Item }),
+  z.object({ action: z.literal("weight"), ...Item, weight: z.number().int().min(1).max(5) }),
+  z.object({ action: z.literal("add"), ...Item, description: z.string().trim().max(300).optional() }),
 ]);
 
 export async function POST(req: Request) {
@@ -28,7 +30,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
     const item = { kind: body.kind, mode_key: body.modeKey, name: body.name };
+    // Gewichte und eigene Einträge wirken sofort (beim Lesen des Profils) – keine Neuberechnung nötig
     if (body.action === "correct") await setCorrection(user.id, { ...item, verdict: body.verdict });
+    else if (body.action === "weight") await setWeight(user.id, item, body.weight);
+    else if (body.action === "add") await setCorrection(user.id, { ...item, verdict: "add", weight: 4, description: body.description || null });
     else await removeCorrection(user.id, item);
     return NextResponse.json({ ok: true });
   } catch (err) {

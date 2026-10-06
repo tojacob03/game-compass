@@ -4,6 +4,7 @@ import { engagementOf } from "./engagement";
 import { ensureGameFacts } from "./gamefacts";
 import { markProfileStale } from "./taste";
 import type { GameChips } from "./types";
+import { VERDICT_SCORE } from "./verdicts";
 
 export type QuickCard = {
   gameId: string;
@@ -121,7 +122,6 @@ export async function quickRateBatch(userId: string, n = 8): Promise<{ cards: Qu
   return { cards, remaining: rows.length };
 }
 
-export const VERDICT_SCORE = { love: 10, good: 7, meh: 5, bad: 3 } as const;
 export type Verdict = keyof typeof VERDICT_SCORE | "skip";
 
 export async function saveQuickRating(

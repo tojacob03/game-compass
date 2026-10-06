@@ -320,7 +320,7 @@ const significant = (s: string) =>
  */
 export function capUnprovenAversions(profile: StoredTasteProfile, ownWords: string, corrections: Correction[]): StoredTasteProfile {
   const corpus = significant(ownWords);
-  const confirmed = new Set(corrections.filter((c) => c.verdict === "confirm").map((c) => correctionKey(c.kind, c.mode_key, c.name)));
+  const confirmed = new Set(corrections.filter((c) => c.verdict !== "reject").map((c) => correctionKey(c.kind, c.mode_key, c.name)));
   const cap = <T extends { name: string; description: string; severity: number }>(a: T, modeKey: string | null): T => {
     if (a.severity < 4 || confirmed.has(correctionKey("aversion", modeKey, a.name))) return a;
     const words = significant(`${a.name} ${a.description}`);
@@ -334,9 +334,12 @@ export function capUnprovenAversions(profile: StoredTasteProfile, ownWords: stri
   };
 }
 
-/** Abgelehntes entfernen, Bestätigtes erhalten (falls die KI es weggelassen hat). */
+/**
+ * Bestätigtes erhalten, falls die KI es weggelassen hat. Ausblenden, Gewichte und eigene Einträge werden NICHT
+ * eingebacken, sondern beim Lesen angewendet (getTasteProfile) – so lassen sie sich jederzeit zurücknehmen.
+ */
 function enforceCorrections(profile: StoredTasteProfile, previous: StoredTasteProfile | null | undefined, corrections: Correction[]): StoredTasteProfile {
-  const out = applyCorrections(profile, corrections);
+  const out = stripTuning(profile);
   if (!previous) return out;
   for (const c of corrections.filter((x) => x.verdict === "confirm")) {
     const same = (n: string) => n.trim().toLowerCase() === c.name.trim().toLowerCase();
@@ -356,7 +359,23 @@ function enforceCorrections(profile: StoredTasteProfile, previous: StoredTastePr
       if (old && !mode.aversions.some((a) => same(a.name))) mode.aversions.push(old);
     }
   }
-  return out;
+  return stripTuning(out);
+}
+
+/** Laufzeit-Markierungen und eigene Einträge entfernen, bevor ein Profil gespeichert wird. */
+function stripTuning(p: StoredTasteProfile): StoredTasteProfile {
+  const clean = <T extends { own?: boolean; tuned?: boolean }>(list: T[]) =>
+    list.filter((x) => !x.own).map((x) => {
+      const rest = { ...x };
+      delete rest.own;
+      delete rest.tuned;
+      return rest;
+    });
+  return {
+    ...p,
+    modes: p.modes.map((m) => ({ ...m, drivers: clean(m.drivers), aversions: clean(m.aversions) })),
+    global_aversions: clean(p.global_aversions),
+  };
 }
 
 export async function embedIntents(profile: StoredTasteProfile) {
@@ -374,11 +393,11 @@ export async function buildTasteProfile(user: UserRow): Promise<StoredTasteProfi
   await consumeAi(user.id, 2);
   const [previous, corrections] = await Promise.all([getTasteProfile(user.id).then((p) => p?.profile), loadCorrections(user.id)]);
   const profile = await generateTasteProfile(input, user.about_me, previous, corrections);
-  await saveTasteProfile(user.id, profile);
-  return profile;
+  await saveTasteProfile(user.id, profile, corrections);
+  return applyCorrections(profile, corrections);
 }
 
-async function saveTasteProfile(userId: string, profile: StoredTasteProfile) {
+async function saveTasteProfile(userId: string, profile: StoredTasteProfile, corrections: Correction[]) {
   const intents = await embedIntents(profile);
   must(await db().from("taste_intents").delete().eq("user_id", userId), "taste_intents.delete");
   must(
@@ -387,6 +406,7 @@ async function saveTasteProfile(userId: string, profile: StoredTasteProfile) {
       .insert(
         intents.map((i) => ({
           user_id: userId,
+          kind: "intent",
           label: i.label,
           description: i.description,
           weight: i.weight,
@@ -396,6 +416,7 @@ async function saveTasteProfile(userId: string, profile: StoredTasteProfile) {
       ),
     "taste_intents.insert",
   );
+  await ensureFacetVectors(userId, applyCorrections(profile, corrections));
   must(
     await db()
       .from("taste_profiles")
@@ -412,12 +433,78 @@ export async function getTasteProfile(userId: string): Promise<{ profile: Stored
   return { ...row, profile: applyCorrections(row.profile, await loadCorrections(userId)) };
 }
 
+// ---------------------------------------------------------------------------
+// Treiber + Abneigungen als Vektoren (für das Ranking)
+// ---------------------------------------------------------------------------
+
+export type Facet = { kind: "driver" | "aversion"; mode_key: string | null; name: string; weight: number; vector: number[] };
+
+/** Alle Treiber/Abneigungen des (korrigierten) Profils inkl. eigener Einträge der Person. */
+export function facetsOf(profile: StoredTasteProfile) {
+  return [
+    ...profile.modes.flatMap((m) => [
+      ...m.drivers.map((d) => ({ kind: "driver" as const, mode_key: m.key, name: d.name, weight: d.weight, text: `${d.name}: ${d.description}` })),
+      ...m.aversions.map((a) => ({ kind: "aversion" as const, mode_key: m.key, name: a.name, weight: a.severity, text: `${a.name}: ${a.description}` })),
+    ]),
+    ...profile.global_aversions.map((a) => ({ kind: "aversion" as const, mode_key: null, name: a.name, weight: a.severity, text: `${a.name}: ${a.description}` })),
+  ];
+}
+
+const facetKey = (kind: string, modeKey: string | null, name: string) => `${kind}|${modeKey ?? ""}|${name.trim().toLowerCase()}`;
+
+/**
+ * Vektoren für alle Treiber/Abneigungen bereitstellen. Fehlende (neue eigene Einträge, ältere Profile) werden
+ * nachträglich eingebettet – ein Embedding-Aufruf, kein KI-Kontingent. Gewichte kommen immer frisch aus dem Profil,
+ * damit Änderungen der Person sofort wirken.
+ */
+export async function ensureFacetVectors(userId: string, profile: StoredTasteProfile): Promise<Facet[]> {
+  const wanted = facetsOf(profile);
+  const rows = must(
+    await db().from("taste_intents").select("id, kind, mode_key, name, embedding").eq("user_id", userId).in("kind", ["driver", "aversion"]),
+    "taste_intents.facets",
+  ) as { id: string; kind: string; mode_key: string | null; name: string; embedding: unknown }[];
+  const have = new Map(rows.map((r) => [facetKey(r.kind, r.mode_key, r.name), r]));
+  const missing = wanted.filter((f) => !have.has(facetKey(f.kind, f.mode_key, f.name)));
+  const fresh = new Map<string, number[]>();
+  if (missing.length) {
+    const vectors = await embed(missing.map((f) => f.text));
+    missing.forEach((f, i) => fresh.set(facetKey(f.kind, f.mode_key, f.name), vectors[i]));
+    must(
+      await db()
+        .from("taste_intents")
+        .insert(
+          missing.map((f, i) => ({
+            user_id: userId,
+            kind: f.kind,
+            name: f.name,
+            label: f.name,
+            description: f.text,
+            weight: f.weight,
+            mode_key: f.mode_key,
+            embedding: toPgVector(vectors[i]),
+          })),
+        ),
+      "taste_intents.facets.insert",
+    );
+  }
+  const wantedKeys = new Set(wanted.map((f) => facetKey(f.kind, f.mode_key, f.name)));
+  const obsolete = rows.filter((r) => !wantedKeys.has(facetKey(r.kind, r.mode_key, r.name))).map((r) => r.id);
+  if (obsolete.length) await db().from("taste_intents").delete().in("id", obsolete);
+
+  return wanted.map((f) => {
+    const k = facetKey(f.kind, f.mode_key, f.name);
+    return { kind: f.kind, mode_key: f.mode_key, name: f.name, weight: f.weight, vector: fresh.get(k) ?? parsePgVector(have.get(k)!.embedding) ?? [] };
+  });
+}
+
 export async function markProfileStale(userId: string) {
   await db().from("taste_profiles").update({ stale: true }).eq("user_id", userId);
 }
 
+const mark = (x: { own?: boolean; tuned?: boolean }) => (x.own ? " (von der Person selbst ergänzt)" : x.tuned ? " (Gewicht von der Person festgelegt)" : "");
+
 function aversionLines(list: TasteMode["aversions"]) {
-  return list.map((a) => `- [${a.severity}] ${a.name}: ${a.description} (Belege: ${a.evidence.join(", ")})`);
+  return list.map((a) => `- [${a.severity}] ${a.name}: ${a.description}${mark(a)}${a.own ? "" : ` (Belege: ${a.evidence.join(", ")})`}`);
 }
 
 /** Profil für Prompts – optional auf einen Modus fokussiert. */
@@ -430,7 +517,7 @@ export function profileForPrompt(p: StoredTasteProfile, modeKey?: string | null)
         `\n### Modus "${m.name}" ${m.emoji} – ${m.tagline}${m.when ? ` (${m.when})` : ""}`,
         `Anker-Spiele: ${m.anchors.join(", ")}`,
         "Treiber (Gewicht 1-5):",
-        ...m.drivers.map((d) => `- [${d.weight}] ${d.name}: ${d.description} (Belege: ${d.evidence.join(", ")})`),
+        ...m.drivers.map((d) => `- [${d.weight}] ${d.name}: ${d.description}${mark(d)}${d.own ? "" : ` (Belege: ${d.evidence.join(", ")})`}`),
         m.aversions.length ? "Abneigungen in diesem Modus (Schwere 1-5):" : "",
         ...aversionLines(m.aversions),
       ]

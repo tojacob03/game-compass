@@ -8,7 +8,8 @@ export function RecommendationRunner({ hasRecs, mode, modeLabel }: { hasRecs: bo
       <div className="min-w-0">
         <h2 className="h2">{hasRecs ? `Neue Runde: ${modeLabel}` : `Empfehlungen: ${modeLabel}`}</h2>
         <p className="text-sm text-muted">
-          Dauert ein paar Minuten – neue Kandidaten werden erst gründlich analysiert. Läuft im Hintergrund weiter.
+          Dauert ein paar Minuten – neue Kandidaten werden erst gründlich analysiert. Neue Bewertungen und deine Einstellungen
+          unter Geschmack fließen automatisch ein. Läuft im Hintergrund weiter.
         </p>
       </div>
       <JobControl kind="recommend" mode={mode} label={hasRecs ? "Neu generieren" : "Generieren"} />

@@ -6,7 +6,6 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform
 import { useCallback, useEffect, useRef, useState } from "react";
 import { postJson } from "@/lib/client";
 import type { QuickCard } from "@/lib/quickrate";
-import { RebuildProfileButton } from "./ProfileActions";
 import { GameImage } from "./ui/GameImage";
 
 type Verdict = "love" | "good" | "meh" | "bad" | "skip";
@@ -149,14 +148,16 @@ export function QuickRate() {
         <h2 className="h2">{done ? `${done} Spiele bewertet – stark!` : "Alles bewertet"}</h2>
         <p className="text-muted">
           {done
-            ? "Berechne dein Profil neu – deine Spielmodi werden mit den neuen Urteilen geschärft."
+            ? "Deine Urteile wirken sofort aufs Ranking. Deine Spielmodi werden bei der nächsten Empfehlungsrunde automatisch nachgeschärft."
             : "Für alle gespielten Spiele liegt ein Urteil vor. Spiel mehr oder synchronisiere neu."}
         </p>
         {error && <p className="text-sm text-bad">{error}</p>}
         <div className="flex flex-col items-center gap-3">
-          {done > 0 && <RebuildProfileButton label="Profil jetzt neu berechnen" />}
-          <Link href="/dashboard" className="btn-ghost">
-            Zur Übersicht
+          <Link href="/recommendations" className="btn-primary">
+            Neue Empfehlungen holen
+          </Link>
+          <Link href="/profile" className="text-sm text-muted transition hover:text-text">
+            Oder Geschmack feinjustieren →
           </Link>
         </div>
       </motion.div>

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { postJson } from "@/lib/client";
+import { VERDICT_SCORE, verdictOf, type RatingVerdict } from "@/lib/verdicts";
+import { VerdictPicker } from "./VerdictPicker";
 
 type Status = "backlog" | "playing" | "finished" | "dropped" | null;
 
@@ -21,7 +23,9 @@ export function RatingForm({
   }));
   const allAspects = [...new Set([...(aspects?.loved ?? []), ...(aspects?.criticized ?? []), ...initial.liked, ...initial.dislikedAspects])];
   const router = useRouter();
-  const [score, setScore] = useState<number | null>(initial.score);
+  const [verdict, setVerdict] = useState<RatingVerdict | null>(verdictOf(initial.score));
+  // Unverändertes Urteil behält eine ältere, feinere Wertung (z. B. 8/10)
+  const score = verdict === verdictOf(initial.score) ? initial.score : verdict ? VERDICT_SCORE[verdict] : null;
   const [loved, setLoved] = useState(initial.loved ?? "");
   const [disliked, setDisliked] = useState(initial.disliked ?? "");
   const [status, setStatus] = useState<Status>(initial.status);
@@ -40,7 +44,7 @@ export function RatingForm({
         likedAspects: Object.entries(tones).filter(([, t]) => t === "liked").map(([a]) => a),
         dislikedAspects: Object.entries(tones).filter(([, t]) => t === "disliked").map(([a]) => a),
       });
-      setMsg("Gespeichert – dein Geschmacksprofil wird beim nächsten Mal aktualisiert.");
+      setMsg("Gespeichert – wirkt sofort aufs Ranking.");
       router.refresh();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Fehler");
@@ -51,26 +55,10 @@ export function RatingForm({
 
   return (
     <div className="space-y-4">
-      <div>
-        <span className="label">Wertung</span>
-        <div className="flex flex-wrap gap-1">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setScore(score === n ? null : n)}
-              className={`h-9 w-9 rounded-md border text-sm font-semibold transition ${
-                score === n ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface-2 hover:border-muted"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
+      <VerdictPicker value={verdict} onChange={setVerdict} />
       {allAspects.length > 0 && (
         <div>
-          <span className="label">Aspekte (antippen: ＋ gepackt, nochmal: − gestört)</span>
+          <span className="label">Was hat gepackt, was gestört? (antippen = ＋, nochmal = −)</span>
           <div className="flex flex-wrap gap-2">
             {allAspects.map((a) => {
               const t = tones[a];
@@ -105,7 +93,7 @@ export function RatingForm({
         </label>
         <textarea
           id="loved"
-          className="input min-h-24"
+          className="input min-h-20"
           value={loved}
           onChange={(e) => setLoved(e.target.value)}
           maxLength={2000}
@@ -118,7 +106,7 @@ export function RatingForm({
         </label>
         <textarea
           id="disliked"
-          className="input min-h-20"
+          className="input min-h-16"
           value={disliked}
           onChange={(e) => setDisliked(e.target.value)}
           maxLength={2000}
@@ -156,7 +144,7 @@ export function RatingForm({
         {msg && <span className="text-sm text-muted">{msg}</span>}
       </div>
       <p className="text-xs text-muted">
-        Tipp: Die Freitexte sind das wichtigste Signal. Je konkreter („die Momente, in denen …“), desto besser die Empfehlungen.
+        Optional, aber das stärkste Signal: Je konkreter die Freitexte („die Momente, in denen …“), desto genauer die Modi.
       </p>
     </div>
   );

@@ -3,19 +3,15 @@ import { AnchorStrip } from "@/components/ModeCards";
 import { Reveal } from "@/components/ui/Reveal";
 import { BeamDot, TracingBeam } from "@/components/ui/TracingBeam";
 import { AboutMeForm, EvalRunner, RebuildProfileButton } from "@/components/ProfileActions";
-import { CorrectionButtons, RejectedList } from "@/components/ProfileCorrections";
-import { correctionKey, loadCorrections } from "@/lib/corrections";
+import { AddFacet, FacetControls, RejectedList } from "@/components/ProfileCorrections";
+import { loadCorrections } from "@/lib/corrections";
 import { imagesForTitles } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 import { getTasteProfile } from "@/lib/taste";
 
-const dots = (n: number) => "●".repeat(n) + "○".repeat(5 - n);
-
 export default async function Profile() {
   const user = await requireUser();
   const [tp, corrections] = await Promise.all([getTasteProfile(user.id), loadCorrections(user.id)]);
-  const confirmed = new Set(corrections.filter((c) => c.verdict === "confirm").map((c) => correctionKey(c.kind, c.mode_key, c.name)));
-  const isConfirmed = (kind: string, modeKey: string | null, name: string) => confirmed.has(correctionKey(kind, modeKey, name));
   const p = tp?.profile;
   const images = p ? await imagesForTitles(p.modes.flatMap((m) => m.anchors)) : new Map();
 
@@ -23,26 +19,49 @@ export default async function Profile() {
     <Reveal className="space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="h1">Mein Geschmack</h1>
-          <p className="text-muted">
+          <p className="eyebrow">Schritt 02 · Feinjustieren</p>
+          <h1 className="h1 mt-1">Mein Geschmack</h1>
+          <p className="max-w-2xl text-muted">
             {tp
-              ? `Zuletzt berechnet ${new Date(tp.updated_at).toLocaleString("de-DE")}${tp.stale ? " · es gibt neue Bewertungen" : ""}`
+              ? "Hier legst du fest, was dir wichtig ist. Jede Änderung wirkt sofort auf die nächste Empfehlungsrunde und den Chat."
               : "Noch kein Profil – bewerte ein paar Spiele und erstelle es dann."}
           </p>
         </div>
-        <RebuildProfileButton label={tp ? "Neu berechnen" : "Profil erstellen"} />
+        <div className="space-y-1.5 sm:text-right">
+          <RebuildProfileButton label={tp ? "Aus Bewertungen neu ableiten" : "Profil erstellen"} />
+          {tp && (
+            <p className="text-xs text-muted">
+              Zuletzt {new Date(tp.updated_at).toLocaleDateString("de-DE")}
+              {tp.stale ? " · neue Bewertungen fließen bei der nächsten Empfehlungsrunde automatisch ein" : ""}
+            </p>
+          )}
+        </div>
       </div>
 
       {p && (
         <>
           <section className="card p-5">
             <p className="leading-relaxed sm:text-lg">{p.summary}</p>
-            <p className="mt-3 text-xs text-muted">
-              Deine Modi entstehen automatisch: Spiele mit ähnlichem Erlebnis werden gruppiert – gewichtet danach, wie sehr sie
-              dich gepackt haben (Bewertung oder Spielzeit im Vergleich zur typischen Spielzeit). Besitz allein zählt nicht.
-              Mit <span className="text-good">✓</span> bestätigst, mit <span className="text-bad">✕</span> streichst du Einträge – das
-              wirkt sofort auf Empfehlungen und Chat und bleibt beim Neuberechnen erhalten.
-            </p>
+            <dl className="mt-5 grid gap-4 border-t border-line pt-4 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="flex items-center gap-1.5 font-medium">
+                  <span className="flex gap-1">
+                    {[1, 2, 3].map((n) => <span key={n} className="h-1.5 w-1.5 rounded-full bg-accent" />)}
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/15" />
+                  </span>
+                  Punkte antippen
+                </dt>
+                <dd className="mt-1 text-muted">Wie wichtig dir ein Treiber ist bzw. wie sehr dich etwas stört – 5 Punkte = No-Go.</dd>
+              </div>
+              <div>
+                <dt className="font-medium">✕ Stimmt nicht</dt>
+                <dd className="mt-1 text-muted">Wird ausgeblendet und kommt auch beim Neuableiten nicht wieder.</dd>
+              </div>
+              <div>
+                <dt className="font-medium">+ Eigenes ergänzen</dt>
+                <dd className="mt-1 text-muted">Was die KI aus deinen Spielen nicht sehen kann – z. B. „Koop mit Freunden“ oder „Zeitdruck“.</dd>
+              </div>
+            </dl>
           </section>
 
           <TracingBeam>
@@ -67,37 +86,31 @@ export default async function Profile() {
                 <div className="grid gap-6 p-5 lg:grid-cols-2">
                   <div className="space-y-3">
                     <h3 className="label !text-good">Was dich hier antreibt</h3>
-                    {m.drivers.map((d) => (
+                    {[...m.drivers].sort((a, b) => b.weight - a.weight).map((d) => (
                       <div key={d.name}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{d.name}</span>
-                          <span className="flex items-center gap-2">
-                            <span className="text-xs text-accent" title={`Gewicht ${d.weight}/5`}>
-                              {dots(d.weight)}
-                            </span>
-                            <CorrectionButtons item={{ kind: "driver", modeKey: m.key, name: d.name }} confirmed={isConfirmed("driver", m.key, d.name)} />
-                          </span>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="pt-0.5 font-medium">{d.name}</span>
+                          <FacetControls item={{ kind: "driver", modeKey: m.key, name: d.name }} value={d.weight} tuned={!!d.tuned} own={!!d.own} />
                         </div>
-                        <p className="text-sm text-muted">{d.description}</p>
-                        <p className="text-xs text-muted/80">Belege: {d.evidence.join(", ")}</p>
+                        {d.description && <p className="text-sm text-muted">{d.description}</p>}
+                        {!d.own && <p className="text-xs text-muted/80">Belege: {d.evidence.join(", ")}</p>}
                       </div>
                     ))}
+                    <AddFacet kind="driver" modeKey={m.key} placeholder="z. B. Basis langsam ausbauen: von nichts zur Festung" />
                   </div>
                   <div className="space-y-3">
                     <h3 className="label !text-bad">Was dich hier stört</h3>
                     {m.aversions.length === 0 && <p className="text-sm text-muted">Noch nichts erkannt.</p>}
-                    {m.aversions.map((a) => (
+                    {[...m.aversions].sort((a, b) => b.severity - a.severity).map((a) => (
                       <div key={a.name}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{a.name}</span>
-                          <span className="flex items-center gap-2">
-                            <span className="text-xs text-bad">{a.severity >= 5 ? "No-Go" : dots(a.severity)}</span>
-                            <CorrectionButtons item={{ kind: "aversion", modeKey: m.key, name: a.name }} confirmed={isConfirmed("aversion", m.key, a.name)} />
-                          </span>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="pt-0.5 font-medium">{a.name}</span>
+                          <FacetControls item={{ kind: "aversion", modeKey: m.key, name: a.name }} value={a.severity} tuned={!!a.tuned} own={!!a.own} />
                         </div>
-                        <p className="text-sm text-muted">{a.description}</p>
+                        {a.description && <p className="text-sm text-muted">{a.description}</p>}
                       </div>
                     ))}
+                    <AddFacet kind="aversion" modeKey={m.key} placeholder="z. B. Zeitlimits, die mich hetzen" />
                     <details className="pt-2 text-sm">
                       <summary className="cursor-pointer text-muted hover:text-text">Wonach gesucht wird</summary>
                       <div className="mt-2 space-y-2">
@@ -119,17 +132,16 @@ export default async function Profile() {
             <section className="card space-y-2 p-4">
               <h3 className="font-display font-semibold text-bad">In jedem Modus ein No-Go</h3>
               {p.global_aversions.length === 0 && <p className="text-sm text-muted">Nichts Modus-übergreifendes erkannt.</p>}
-              <ul className="space-y-1 text-sm text-muted">
+              <ul className="space-y-3 text-sm">
                 {p.global_aversions.map((a) => (
-                  <li key={a.name} className="flex items-start justify-between gap-2">
-                    <span>
-                      <span className="text-text">{a.name}</span>
-                      {a.severity >= 5 && <span className="ml-1 text-xs text-bad">No-Go</span>} – {a.description}
-                    </span>
-                    <CorrectionButtons item={{ kind: "aversion", modeKey: null, name: a.name }} confirmed={isConfirmed("aversion", null, a.name)} />
+                  <li key={a.name} className="space-y-1">
+                    <div className="text-text">{a.name}</div>
+                    <FacetControls item={{ kind: "aversion", modeKey: null, name: a.name }} value={a.severity} tuned={!!a.tuned} own={!!a.own} />
+                    {a.description && <p className="text-muted">{a.description}</p>}
                   </li>
                 ))}
               </ul>
+              <AddFacet kind="aversion" modeKey={null} placeholder="z. B. Mikrotransaktionen" />
             </section>
             <section className="card space-y-2 p-4">
               <h3 className="font-display font-semibold">Offene Fragen</h3>
@@ -171,14 +183,18 @@ export default async function Profile() {
         <AboutMeForm initial={user.about_me ?? ""} />
       </section>
 
-      <section className="card space-y-3 p-5">
-        <h2 className="h2">Selbsttest: Wie gut ist die Engine für dich?</h2>
-        <p className="text-sm text-muted">
-          Wir verstecken ein paar deiner Lieblingsspiele (≥ 8/10), bauen dein Profil ohne sie neu und schauen, wie weit oben sie
-          unter fremden Spielen landen – im Vergleich zu klassischem Tag-Matching und reiner Beliebtheit.
-        </p>
-        <EvalRunner />
-      </section>
+      <details className="card group p-5">
+        <summary className="cursor-pointer list-none text-sm text-muted transition hover:text-text">
+          Für Neugierige: Selbsttest – wie gut trifft die Engine deinen Geschmack?
+        </summary>
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-muted">
+            Wir verstecken ein paar deiner Lieblingsspiele (≥ 8/10), bauen dein Profil ohne sie neu und schauen, wie weit oben sie
+            unter fremden Spielen landen – im Vergleich zu klassischem Tag-Matching und reiner Beliebtheit.
+          </p>
+          <EvalRunner />
+        </div>
+      </details>
     </Reveal>
   );
 }

@@ -17,9 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/dashboard", label: "Heute", icon: "today", primary: true },
     { href: "/recommendations", label: "Entdecken", icon: "discover", primary: true },
     { href: "/rate", label: "Bewerten", icon: "rate", primary: true, badge: unrated },
+    { href: "/profile", label: "Geschmack", icon: "profile", primary: true },
     { href: "/chat", label: "Chat", icon: "chat", primary: true },
-    { href: "/library", label: "Bibliothek", icon: "library", primary: true },
-    { href: "/profile", label: "Geschmack", icon: "profile" },
+    { href: "/library", label: "Bibliothek", icon: "library" },
     { href: "/groups", label: "Gruppen", icon: "groups" },
     ...(user.is_admin ? [{ href: "/admin", label: "Admin", icon: "admin" as const }] : []),
   ];
@@ -35,8 +35,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLinks links={links} />
           <div className="ml-auto flex items-center gap-3">
             <JobPill />
-            <Link href="/profile" className="text-xs text-muted hover:text-text md:hidden">
-              Geschmack
+            <Link href="/library" className="text-xs text-muted hover:text-text md:hidden">
+              Bibliothek
             </Link>
             <Link href="/groups" className="text-xs text-muted hover:text-text md:hidden">
               Gruppen

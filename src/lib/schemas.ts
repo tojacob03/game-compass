@@ -93,9 +93,18 @@ export const TasteProfileSchema = z.object({
   exploration_edges: z.array(z.string()).describe("Richtungen, die die Person noch nicht kennt, aber mögen könnte"),
 });
 export type TasteProfile = z.infer<typeof TasteProfileSchema>;
-export type TasteMode = TasteProfile["modes"][number] & { key: string; anchors: string[] };
+/** own = von der Person selbst ergänzt, tuned = Gewicht/Schwere von der Person gesetzt (nur zur Laufzeit). */
+type Tuning = { own?: boolean; tuned?: boolean };
+export type Driver = z.infer<typeof DriverSchema> & Tuning;
+export type Aversion = z.infer<typeof AversionSchema> & Tuning;
+export type TasteMode = Omit<TasteProfile["modes"][number], "drivers" | "aversions"> & {
+  key: string;
+  anchors: string[];
+  drivers: Driver[];
+  aversions: Aversion[];
+};
 /** Gespeichertes Profil: Modi mit stabilem Schlüssel + Anker-Spielen aus dem Clustering. */
-export type StoredTasteProfile = Omit<TasteProfile, "modes"> & { modes: TasteMode[]; version: 2 };
+export type StoredTasteProfile = Omit<TasteProfile, "modes" | "global_aversions"> & { modes: TasteMode[]; global_aversions: Aversion[]; version: 2 };
 
 export const GameFactsSchema = z.object({
   games: z.array(

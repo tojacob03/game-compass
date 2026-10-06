@@ -15,7 +15,7 @@ export function AboutMeForm({ initial }: { initial: string }) {
     setBusy(true);
     try {
       await postJson("/api/profile", { action: "about", aboutMe: text });
-      setMsg("Gespeichert.");
+      setMsg("Gespeichert – fließt bei der nächsten Empfehlungsrunde ein.");
       router.refresh();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Fehler");
@@ -27,8 +27,9 @@ export function AboutMeForm({ initial }: { initial: string }) {
   return (
     <div className="space-y-2">
       <label className="label" htmlFor="about">
-        Über dich (in deinen Worten)
+        Was sonst noch zählt – in deinen Worten
       </label>
+      <p className="-mt-1 mb-2 text-xs text-muted">Wann und wie du spielst, was du generell suchst oder meidest. Wird beim Ableiten deiner Modi berücksichtigt.</p>
       <textarea
         id="about"
         className="input min-h-28"
@@ -59,7 +60,8 @@ type EvalResult = {
 };
 
 const METHOD_LABEL: Record<string, string> = {
-  essence: "GameCompass (Essenz + Facetten)",
+  personal: "GameCompass (Facetten + deine Spiele + Gewichte)",
+  essence: "Nur Such-Facetten (vorheriges Ranking)",
   tags: "Klassisch: Tag-Ähnlichkeit",
   popularity: "Nur Beliebtheit",
 };

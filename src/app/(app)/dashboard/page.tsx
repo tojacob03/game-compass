@@ -1,10 +1,12 @@
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { AnalysisRunner } from "@/components/AnalysisRunner";
 import { GameCard } from "@/components/GameCard";
 import { ModeCards } from "@/components/ModeCards";
 import { RebuildProfileButton } from "@/components/ProfileActions";
 import { SyncButton } from "@/components/SyncButton";
+import { WorkflowSteps } from "@/components/WorkflowSteps";
+import { loadCorrections } from "@/lib/corrections";
 import { Aurora } from "@/components/ui/Aurora";
 import { FitRing } from "@/components/ui/FitRing";
 import { Rail } from "@/components/ui/Rail";
@@ -17,7 +19,7 @@ import { getTasteProfile } from "@/lib/taste";
 
 export default async function Today() {
   const user = await requireUser();
-  const [owned, wishlist, rated, queue, unrated, tp, recs] = await Promise.all([
+  const [owned, wishlist, rated, queue, unrated, tp, recs, corrections] = await Promise.all([
     countUserGames(user.id, "owned"),
     countUserGames(user.id, "wishlisted"),
     countUserGames(user.id, "rated"),
@@ -25,7 +27,10 @@ export default async function Today() {
     countUnrated(user.id),
     getTasteProfile(user.id),
     latestRecommendations(user.id),
+    loadCorrections(user.id),
   ]);
+  const tuned = corrections.filter((c) => c.verdict !== "reject").length;
+  const hidden = corrections.length - tuned;
   const images = tp ? await imagesForTitles(tp.profile.modes.flatMap((m) => m.anchors)) : new Map();
   const now = new Date();
   const hour = Number(now.toLocaleString("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }));
@@ -46,12 +51,6 @@ export default async function Today() {
               Worauf hast du <span className="italic text-accent">heute</span> Lust?
             </SplitHeadline>
           </div>
-          {tp?.stale && (
-            <div className="w-full max-w-xs" data-reveal>
-              <p className="label">Neue Bewertungen seit dem letzten Profil</p>
-              <RebuildProfileButton label="Profil aktualisieren" />
-            </div>
-          )}
         </div>
 
         {tp ? (
@@ -75,19 +74,37 @@ export default async function Today() {
         )}
       </section>
 
-      {unrated > 0 && (
-        <Link href="/rate" data-reveal className="group flex items-center gap-5 border-y border-line py-5 transition hover:border-line-strong">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition group-hover:scale-105">
-            <Zap size={18} strokeWidth={2} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="font-display text-xl font-medium">
-              <span className="tabular-nums">{unrated}</span> gespielte Spiele warten auf ein kurzes Urteil
-            </div>
-            <div className="text-sm text-muted">Ein Wisch pro Spiel – schärft deine Modi am meisten.</div>
-          </div>
-          <ArrowRight size={18} className="shrink-0 text-muted transition group-hover:translate-x-1 group-hover:text-text" />
-        </Link>
+      {tp && (
+        <section className="space-y-3">
+          <p className="eyebrow" data-reveal>
+            So wird&apos;s genauer
+          </p>
+          <WorkflowSteps
+            steps={[
+              {
+                href: "/rate",
+                title: "Bewerten",
+                role: "Was du gespielt hast – ein Tipp pro Spiel, optional was gepackt oder gestört hat.",
+                status: unrated > 0 ? `${unrated} Spiele warten auf ein Urteil` : "Alles Gespielte ist bewertet",
+                highlight: unrated > 0,
+              },
+              {
+                href: "/profile",
+                title: "Feinjustieren",
+                role: "Was dir wichtig ist – Gewichte setzen, Falsches streichen, Eigenes ergänzen.",
+                status: tuned || hidden ? `${tuned} festgelegt · ${hidden} ausgeblendet` : "Noch alles so, wie die KI es sieht",
+                highlight: !tuned && !hidden,
+              },
+              {
+                href: "/recommendations",
+                title: "Entdecken",
+                role: "Neue Spiele pro Modus – jede Reaktion verschiebt die nächste Runde.",
+                status: tp.stale ? "Neue Bewertungen fließen in die nächste Runde ein" : recs.length ? `${recs.length} aktuelle Vorschläge` : "Erste Runde holen",
+                highlight: tp.stale || !recs.length,
+              },
+            ]}
+          />
+        </section>
       )}
 
       {recs.length > 0 && (

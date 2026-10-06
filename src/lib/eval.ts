@@ -1,9 +1,11 @@
 import "server-only";
 import { db, must } from "./db";
-import { parsePgVector } from "./gemini";
+import { embed, parsePgVector } from "./gemini";
+import { loadNeighbors, personalScorer } from "./personal";
+import { catalogMean } from "./similar";
 import { scoreCandidate, wilson, type Intent } from "./recommend";
 import { HttpError } from "./session";
-import { buildModeInput, embedIntents, generateTasteProfile } from "./taste";
+import { buildModeInput, embedIntents, facetsOf, generateTasteProfile } from "./taste";
 import type { UserRow } from "./types";
 import { consumeAi } from "./usage";
 
@@ -71,7 +73,20 @@ export async function evaluateHoldout(user: UserRow) {
     return dot / tagNorm / Math.sqrt(t.length || 1);
   };
 
+  // Aktuelles Ranking: Facetten + eigene Spiele (ohne die versteckten!) + Treiber/Abneigungen
+  const facetList = facetsOf(profile);
+  const facetVectors = facetList.length ? await embed(facetList.map((f) => f.text)) : [];
+  const [neighbors, mean] = await Promise.all([loadNeighbors(user.id, { excludeGameIds: holdoutIds }), catalogMean()]);
+  const personal = personalScorer({
+    intents,
+    facets: facetList.map((f, i) => ({ ...f, vector: facetVectors[i] })),
+    ...neighbors,
+    mean,
+    modeKey: null,
+  })(pool.map((g) => ({ id: g.id, vector: parsePgVector(g.essence_embedding)!, quality: wilson(g.review_positive, g.review_negative) })));
+
   const methods = {
+    personal: (g: (typeof pool)[number]) => personal.get(g.id)!.score,
     essence: (g: (typeof pool)[number]) =>
       scoreCandidate(parsePgVector(g.essence_embedding)!, intents, wilson(g.review_positive, g.review_negative)).score,
     tags: (g: (typeof pool)[number]) => tagScore(g.tags),

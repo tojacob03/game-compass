@@ -37,9 +37,13 @@ export default async function Discover(props: PageProps<"/recommendations">) {
   return (
     <Reveal className="space-y-8">
       <div className="space-y-2">
-        <p className="eyebrow">{current ? `Modus ${String(modes.indexOf(current) + 1).padStart(2, "0")}` : "Entdecken"}</p>
+        <p className="eyebrow">{current ? `Schritt 03 · Modus ${String(modes.indexOf(current) + 1).padStart(2, "0")}` : "Schritt 03 · Entdecken"}</p>
         <h1 className="h1">{current ? current.name : <>Neues, das zu dir <span className="italic text-accent">passt</span></>}</h1>
         <p className="max-w-3xl text-muted">{current ? current.tagline : "Neue Spiele – ausgewählt nach dem, was dich im jeweiligen Modus wirklich antreibt."}</p>
+        <p className="max-w-3xl text-sm text-muted/80">
+          Reagier einfach auf die Vorschläge: „Eher nicht“ drückt Ähnliches nach unten, „Klingt gut“ zieht es hoch.
+          Falsche Begründungen? Das stellst du unter <Link href="/profile" className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-text">Geschmack</Link> ein.
+        </p>
       </div>
 
       {modes.length > 0 && (
