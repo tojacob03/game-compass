@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -9,7 +9,10 @@ const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "GameCompass",
   description: "Spiele-Empfehlungen nach dem Warum – nicht nach dem Genre.",
+  appleWebApp: { title: "GameCompass", statusBarStyle: "black-translucent" },
 };
+
+export const viewport: Viewport = { themeColor: "#0c0b0a" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
