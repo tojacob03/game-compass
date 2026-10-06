@@ -6,7 +6,9 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform
 import { useCallback, useEffect, useRef, useState } from "react";
 import { postJson } from "@/lib/client";
 import type { QuickCard } from "@/lib/quickrate";
+import { VERDICT_SCORE, verdictOf } from "@/lib/verdicts";
 import { GameImage } from "./ui/GameImage";
+import { FineScore } from "./VerdictPicker";
 
 type Verdict = "love" | "good" | "meh" | "bad" | "skip";
 type Tone = "liked" | "disliked";
@@ -36,8 +38,27 @@ export function QuickRate() {
   const [done, setDone] = useState(0);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [tones, setTones] = useState<Record<string, Tone>>({});
-  const [note, setNote] = useState("");
-  const [showNote, setShowNote] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [loved, setLoved] = useState("");
+  const [disliked, setDisliked] = useState("");
+  // Ausführlich-Modus merkt sich die Wahl für die nächsten Karten (nur Komfort, darf fehlen)
+  const [detail, setDetailState] = useState(() => {
+    try {
+      return localStorage.getItem("gc-rate-detail") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setDetail = (on: boolean) => {
+    setDetailState(on);
+    try {
+      localStorage.setItem("gc-rate-detail", on ? "1" : "0");
+    } catch {}
+  };
+  const pick = (v: Verdict) => {
+    setVerdict(v);
+    if (v !== "skip") setScore(VERDICT_SCORE[v]);
+  };
   const [busy, setBusy] = useState(false);
   const [exit, setExit] = useState<Verdict>("skip");
   const [error, setError] = useState<string | null>(null);
@@ -87,13 +108,23 @@ export function QuickRate() {
       setExit(v);
       try {
         const liked = Object.entries(tones).filter(([, t]) => t === "liked").map(([a]) => a);
-        const disliked = Object.entries(tones).filter(([, t]) => t === "disliked").map(([a]) => a);
-        await postJson("/api/quickrate", { action: "rate", gameId: card.gameId, verdict: v, liked, disliked, note: note.trim() || undefined });
+        const dislikedAspects = Object.entries(tones).filter(([, t]) => t === "disliked").map(([a]) => a);
+        await postJson("/api/quickrate", {
+          action: "rate",
+          gameId: card.gameId,
+          verdict: v,
+          liked,
+          disliked: dislikedAspects,
+          score: v !== "skip" && score != null && verdictOf(score) === v ? score : undefined,
+          loved: loved.trim() || undefined,
+          dislikedText: disliked.trim() || undefined,
+        });
         setDone((d) => d + 1);
         setVerdict(null);
+        setScore(null);
         setTones({});
-        setNote("");
-        setShowNote(false);
+        setLoved("");
+        setDisliked("");
         if (cards && index + 1 < cards.length) setIndex(index + 1);
         else await load();
       } catch (e) {
@@ -102,7 +133,7 @@ export function QuickRate() {
         setBusy(false);
       }
     },
-    [card, busy, tones, note, cards, index, load],
+    [card, busy, tones, score, loved, disliked, cards, index, load],
   );
 
   // Tastatur: 1-4 = Urteil, S = nicht richtig gespielt, Enter = weiter, ←/→ = schnell
@@ -110,7 +141,7 @@ export function QuickRate() {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const hit = VERDICTS.find((x) => x.key === e.key);
-      if (hit) setVerdict(hit.v);
+      if (hit) pick(hit.v);
       if (e.key === "5" || e.key.toLowerCase() === "s") void submit("skip");
       if (e.key === "ArrowRight") void submit("good");
       if (e.key === "ArrowLeft") void submit("bad");
@@ -205,7 +236,7 @@ export function QuickRate() {
                   <motion.button
                     key={x.v}
                     whileTap={{ scale: 0.92 }}
-                    onClick={() => setVerdict(x.v)}
+                    onClick={() => pick(x.v)}
                     className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-3 text-xs transition ${
                       verdict === x.v ? "border-text/50 bg-white/[0.06] text-text" : "border-line text-muted hover:border-line-strong hover:text-text"
                     }`}
@@ -226,19 +257,37 @@ export function QuickRate() {
                     className="space-y-3 overflow-hidden"
                   >
                     <Aspects card={card} verdict={verdict} tones={tones} onCycle={cycle} />
-                    {showNote ? (
-                      <input
-                        className="input"
-                        autoFocus
-                        value={note}
-                        maxLength={1000}
-                        onChange={(e) => setNote(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && void submit(verdict)}
-                        placeholder="In eigenen Worten (optional) …"
-                      />
+                    {detail ? (
+                      <div className="space-y-3 border-t border-line pt-3">
+                        <FineScore
+                          value={score}
+                          onChange={(n) => {
+                            setScore(n);
+                            const v = verdictOf(n);
+                            if (v) setVerdict(v);
+                          }}
+                        />
+                        <textarea
+                          className="input min-h-16 text-sm"
+                          value={loved}
+                          maxLength={2000}
+                          onChange={(e) => setLoved(e.target.value)}
+                          placeholder="Was hat dich gepackt? (eigene Worte – das stärkste Signal)"
+                        />
+                        <textarea
+                          className="input min-h-14 text-sm"
+                          value={disliked}
+                          maxLength={2000}
+                          onChange={(e) => setDisliked(e.target.value)}
+                          placeholder="Was hat dich gestört?"
+                        />
+                        <button className="text-xs text-muted hover:text-text" onClick={() => setDetail(false)}>
+                          Weniger Details
+                        </button>
+                      </div>
                     ) : (
-                      <button className="text-xs text-muted underline hover:text-text" onClick={() => setShowNote(true)}>
-                        + eigene Worte hinzufügen
+                      <button className="text-sm text-muted underline decoration-line-strong underline-offset-4 hover:text-text" onClick={() => setDetail(true)}>
+                        Ausführlich bewerten: Note 1–10 und eigene Worte
                       </button>
                     )}
                   </motion.div>

@@ -84,7 +84,7 @@ export default async function Today() {
               {
                 href: "/rate",
                 title: "Bewerten",
-                role: "Was du gespielt hast – ein Tipp pro Spiel, optional was gepackt oder gestört hat.",
+                role: "Was du gespielt hast – schnell per Tipp oder ausführlich mit Note 1–10 und eigenen Worten.",
                 status: unrated > 0 ? `${unrated} Spiele warten auf ein Urteil` : "Alles Gespielte ist bewertet",
                 highlight: unrated > 0,
               },

@@ -45,3 +45,36 @@ export function VerdictPicker({
     </div>
   );
 }
+
+/** Feinstufe 1–10 unter den vier Urteilen – beide bleiben synchron (8 = "Gut", 9 = "Liebe ich" …). */
+export function FineScore({ value, onChange, disabled }: { value: number | null; onChange: (n: number | null) => void; disabled?: boolean }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <span className="label !mb-0">Genau: Note 1–10</span>
+        <span className="font-mono text-xs text-muted tabular-nums">{value != null ? `${value}/10` : "–"}</span>
+      </div>
+      <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Note von 1 bis 10">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+          const on = value === n;
+          const tone = n >= 9 ? "bg-accent text-accent-ink border-accent" : n >= 7 ? "bg-good text-black border-good" : n >= 5 ? "bg-text/80 text-bg border-text/80" : "bg-bad text-black border-bad";
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={disabled}
+              onClick={() => onChange(on ? null : n)}
+              className={`h-8 rounded-md border text-xs font-semibold tabular-nums transition ${
+                on ? tone : value != null && n < value ? "border-line-strong bg-white/[0.06] text-text/70" : "border-line text-muted hover:border-line-strong hover:text-text"
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

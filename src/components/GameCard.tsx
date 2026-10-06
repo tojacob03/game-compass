@@ -20,7 +20,9 @@ export function GameCard({
   badge,
   variant = "poster",
   className,
+  href,
 }: {
+  href?: string;
   game: GameCardData;
   meta?: React.ReactNode;
   badge?: React.ReactNode;
@@ -30,7 +32,7 @@ export function GameCard({
   const poster = variant === "poster";
   return (
     <Link
-      href={`/games/${game.id}`}
+      href={href ?? `/games/${game.id}`}
       data-reveal
       className={cn(
         "group relative block rounded-2xl transition duration-300 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent",

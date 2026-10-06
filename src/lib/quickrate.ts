@@ -126,17 +126,21 @@ export type Verdict = keyof typeof VERDICT_SCORE | "skip";
 
 export async function saveQuickRating(
   userId: string,
-  input: { gameId: string; verdict: Verdict; liked: string[]; disliked: string[]; note?: string },
+  input: { gameId: string; verdict: Verdict; liked: string[]; disliked: string[]; note?: string; score?: number; loved?: string; dislikedText?: string },
 ) {
   const now = new Date().toISOString();
+  const loved = input.loved ?? (input.note && input.verdict !== "bad" ? input.note : undefined);
+  const dislikedText = input.dislikedText ?? (input.note && input.verdict === "bad" ? input.note : undefined);
   const patch =
     input.verdict === "skip"
       ? { rate_skipped_at: now }
       : {
-          score: VERDICT_SCORE[input.verdict],
+          // Feine Note (1–10) aus dem Ausführlich-Modus, sonst der Standardwert des Urteils
+          score: input.score ?? VERDICT_SCORE[input.verdict],
           liked_aspects: input.liked,
           disliked_aspects: input.disliked,
-          ...(input.note ? (input.verdict === "bad" ? { disliked: input.note } : { loved: input.note }) : {}),
+          ...(loved ? { loved } : {}),
+          ...(dislikedText ? { disliked: dislikedText } : {}),
           rated_at: now,
         };
   must(

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { postJson } from "@/lib/client";
-import { VERDICT_SCORE, verdictOf, type RatingVerdict } from "@/lib/verdicts";
-import { VerdictPicker } from "./VerdictPicker";
+import { VERDICT_SCORE, verdictOf } from "@/lib/verdicts";
+import { FineScore, VerdictPicker } from "./VerdictPicker";
 
 type Status = "backlog" | "playing" | "finished" | "dropped" | null;
 
@@ -23,9 +23,7 @@ export function RatingForm({
   }));
   const allAspects = [...new Set([...(aspects?.loved ?? []), ...(aspects?.criticized ?? []), ...initial.liked, ...initial.dislikedAspects])];
   const router = useRouter();
-  const [verdict, setVerdict] = useState<RatingVerdict | null>(verdictOf(initial.score));
-  // Unverändertes Urteil behält eine ältere, feinere Wertung (z. B. 8/10)
-  const score = verdict === verdictOf(initial.score) ? initial.score : verdict ? VERDICT_SCORE[verdict] : null;
+  const [score, setScore] = useState<number | null>(initial.score);
   const [loved, setLoved] = useState(initial.loved ?? "");
   const [disliked, setDisliked] = useState(initial.disliked ?? "");
   const [status, setStatus] = useState<Status>(initial.status);
@@ -55,7 +53,8 @@ export function RatingForm({
 
   return (
     <div className="space-y-4">
-      <VerdictPicker value={verdict} onChange={setVerdict} />
+      <VerdictPicker value={verdictOf(score)} onChange={(v) => setScore(v ? VERDICT_SCORE[v] : null)} />
+      <FineScore value={score} onChange={setScore} />
       {allAspects.length > 0 && (
         <div>
           <span className="label">Was hat gepackt, was gestört? (antippen = ＋, nochmal = −)</span>

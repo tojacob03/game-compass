@@ -16,6 +16,9 @@ const Body = z.discriminatedUnion("action", [
     liked: z.array(Aspect).max(10).default([]),
     disliked: z.array(Aspect).max(10).default([]),
     note: z.string().trim().max(1000).optional(),
+    score: z.number().int().min(1).max(10).optional(),
+    loved: z.string().trim().max(2000).optional(),
+    dislikedText: z.string().trim().max(2000).optional(),
   }),
 ]);
 

@@ -89,6 +89,15 @@ export default async function Library(props: PageProps<"/library">) {
         items={TABS.map((t) => ({ key: t.id, href: `/library?tab=${t.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`, label: t.label }))}
       />
 
+      <p className="text-sm text-muted">
+        Tipp ein Spiel an, um es ausführlich zu bewerten: Note 1–10, was gepackt und was gestört hat, eigene Worte. Für viele
+        Spiele auf einmal geht&apos;s schneller unter{" "}
+        <Link href="/rate" className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-text">
+          Bewerten
+        </Link>
+        .
+      </p>
+
       {tab === "other" && <AddGameForm />}
       {tab === "family" && (
         <p className="text-sm text-muted">
@@ -108,7 +117,14 @@ export default async function Library(props: PageProps<"/library">) {
             <GameCard
               key={r.games.id}
               game={r.games}
-              badge={r.score != null ? <ScoreBadge score={r.score} /> : undefined}
+              href={r.score == null && r.playtime_minutes >= 60 ? `/games/${r.games.id}#bewerten` : undefined}
+              badge={
+                r.score != null ? (
+                  <ScoreBadge score={r.score} />
+                ) : r.playtime_minutes >= 60 || (r.platform && r.platform !== "steam") ? (
+                  <span className="rounded-lg border border-white/20 bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white/90 backdrop-blur">Bewerten</span>
+                ) : undefined
+              }
               meta={r.owners ? `von ${r.owners.join(", ")}` : <LibraryMeta row={r} />}
             />
           ))}

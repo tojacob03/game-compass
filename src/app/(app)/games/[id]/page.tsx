@@ -161,10 +161,10 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
         )}
       </div>
 
-      <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-        <section className="card space-y-4 p-5">
+      <aside className={`space-y-6 lg:sticky lg:top-24 lg:self-start ${ug && (ug.playtime_minutes > 0 || ug.manual || ug.score != null) ? "order-first lg:order-none" : ""}`}>
+        <section id="bewerten" className="card scroll-mt-24 space-y-4 p-5">
           <div className="flex items-center justify-between">
-            <h2 className="h2">Deine Meinung</h2>
+            <h2 className="h2">Deine Bewertung</h2>
             {ug?.playtime_minutes ? (
               <span className="text-sm text-muted">
                 {Math.round(ug.playtime_minutes / 60)} h gespielt
