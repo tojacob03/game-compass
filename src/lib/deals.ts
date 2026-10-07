@@ -33,6 +33,12 @@ type StoredBundle = {
   tiers: { price: Money | null; games: { itad: string; title: string }[] }[];
 };
 
+/** Regionale Shop-Ableger ("GamesPlanet US") nur fürs eigene Land – fremde Keys sind oft regionsgesperrt. */
+const otherRegion = (shop: string, country: string) => {
+  const m = / ([A-Z]{2})$/.exec(shop);
+  return !!m && m[1] !== country;
+};
+
 async function mapLimit<T>(items: T[], limit: number, fn: (t: T) => Promise<void>) {
   let i = 0;
   await Promise.all(
@@ -74,9 +80,12 @@ async function refreshPrices(games: GameInfo[], rows: Map<string, PriceRow>, cou
   const now = new Date().toISOString();
   const upserts = stale.map((g) => {
     const p = byItad.get(g.itad_id!);
-    const deals: Deal[] = (p?.deals ?? [])
+    const all: Deal[] = (p?.deals ?? [])
+      .filter((d) => !otherRegion(d.shop.name, country))
       .map((d) => ({ shop: d.shop.name, shopId: d.shop.id, price: d.price, regular: d.regular, cut: d.cut, url: d.url, expiry: d.expiry, voucher: d.voucher }))
       .sort((a, b) => a.price.amount - b.price.amount);
+    // Die günstigsten paar + immer Steam als Vergleich
+    const deals = all.filter((d, i) => i < 5 || d.shopId === STEAM_SHOP_ID);
     const row: PriceRow = {
       game_id: g.id,
       deals,
@@ -163,8 +172,22 @@ export type DealsResult = {
  * nur was du noch nicht hast (und nicht über die Steam-Familie spielen kannst).
  * Sortiert nach Passung × Rabatt, mit Bonus für Allzeittief.
  */
-export async function findDeals(user: UserRow): Promise<DealsResult> {
+const RESULT_TTL = 30 * 60 * 1000;
+
+/** Zwischengespeichertes Ergebnis (30 min) – sonst neu berechnen. */
+export async function findDeals(user: UserRow, opts: { fresh?: boolean } = {}): Promise<DealsResult> {
   if (!itadConfigured()) return { configured: false, deals: [], bundles: [], familyCount: 0, checked: 0, updatedAt: null };
+  if (!opts.fresh) {
+    const { data } = await db().from("user_deals").select("result, computed_at").eq("user_id", user.id).maybeSingle();
+    const cached = data as { result: DealsResult; computed_at: string } | null;
+    if (cached && Date.now() - Date.parse(cached.computed_at) < RESULT_TTL) return cached.result;
+  }
+  const result = await computeDeals(user);
+  if (!result.error) await db().from("user_deals").upsert({ user_id: user.id, result, computed_at: new Date().toISOString() });
+  return result;
+}
+
+async function computeDeals(user: UserRow): Promise<DealsResult> {
   const country = env().STEAM_COUNTRY;
 
   const lib = await fetchAll<{ game_id: string; owned: boolean; manual: boolean; wishlisted: boolean }>(

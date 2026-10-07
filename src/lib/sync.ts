@@ -59,5 +59,7 @@ export async function syncSteam(user: UserRow) {
   await refreshMissingAssets().catch((e) => console.warn("Assets", e));
 
   await db().from("taste_profiles").update({ stale: true }).eq("user_id", user.id);
+  // Besitz/Wunschliste haben sich evtl. geändert -> Deals beim nächsten Aufruf neu berechnen
+  await db().from("user_deals").delete().eq("user_id", user.id);
   return { owned: owned.length, wishlist: wishlist.length };
 }

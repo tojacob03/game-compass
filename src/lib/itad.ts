@@ -67,7 +67,7 @@ export async function getPrices(ids: string[], country: string): Promise<ItadPri
     out.push(
       ...(await itad<ItadPrices[]>("/games/prices/v3", {
         method: "POST",
-        query: { country, vouchers: "true", capacity: "8" },
+        query: { country, vouchers: "true", capacity: "0" },
         body: ids.slice(i, i + 200),
       })),
     );
