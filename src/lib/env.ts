@@ -15,6 +15,12 @@ const schema = z.object({
   AI_DAILY_LIMIT_PER_USER: z.coerce.number().int().positive().default(150),
   AI_DAILY_ANALYSIS_LIMIT: z.coerce.number().int().positive().default(600),
   STEAM_COUNTRY: z.string().length(2).default("DE"),
+  // Optional: Deals (https://isthereanydeal.com/apps/my) und Empfehlungscode für Instant-Gaming-Links
+  ITAD_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  INSTANT_GAMING_REF: z.string().default("gamer-81a1cce"),
 });
 
 let cached: z.infer<typeof schema> | null = null;

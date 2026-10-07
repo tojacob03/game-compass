@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, Home, Library, MessageCircle, Settings, Sparkles, Users, Zap, Fingerprint } from "lucide-react";
+import { Compass, Home, Library, MessageCircle, Settings, Sparkles, Tag, Users, Zap, Fingerprint } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGroup, motion } from "motion/react";
@@ -8,6 +8,7 @@ import { LayoutGroup, motion } from "motion/react";
 const ICONS = {
   today: Home,
   discover: Compass,
+  deals: Tag,
   rate: Zap,
   chat: MessageCircle,
   library: Library,

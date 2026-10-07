@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const links: NavItem[] = [
     { href: "/dashboard", label: "Heute", icon: "today", primary: true },
     { href: "/recommendations", label: "Entdecken", icon: "discover", primary: true },
+    { href: "/deals", label: "Deals", icon: "deals" },
     { href: "/rate", label: "Bewerten", icon: "rate", primary: true, badge: unrated },
     { href: "/profile", label: "Geschmack", icon: "profile", primary: true },
     { href: "/chat", label: "Chat", icon: "chat", primary: true },
@@ -35,6 +36,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLinks links={links} />
           <div className="ml-auto flex items-center gap-3">
             <JobPill />
+            <Link href="/deals" className="text-xs text-muted hover:text-text md:hidden">
+              Deals
+            </Link>
             <Link href="/library" className="text-xs text-muted hover:text-text md:hidden">
               Bibliothek
             </Link>
