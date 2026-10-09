@@ -1,5 +1,6 @@
 import "server-only";
 import { refreshMissingAssets } from "./assets";
+import { ensureGfnFresh } from "./gfn";
 import { db, must } from "./db";
 import { enqueueAnalysis } from "./games";
 import { HttpError } from "./session";
@@ -56,6 +57,8 @@ export async function syncSteam(user: UserRow) {
   }
 
   // Echte Bild-URLs (Header, Hochformat-Cover, Hero) für alles, was noch keine hat – kostet keine KI
+  // GeForce-NOW-Liste (täglich) vor den Plattformdaten, damit neue Spiele direkt zugeordnet werden
+  await ensureGfnFresh().catch((e) => console.warn("GeForce NOW", e));
   await refreshMissingAssets().catch((e) => console.warn("Assets", e));
 
   await db().from("taste_profiles").update({ stale: true }).eq("user_id", user.id);

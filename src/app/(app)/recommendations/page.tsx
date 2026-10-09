@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { FeedbackButtons } from "@/components/FeedbackButtons";
+import { PlatformBadges } from "@/components/PlatformBadges";
+import { PlatformScope } from "@/components/PlatformScope";
 import { RecommendationRunner } from "@/components/RecommendationRunner";
 import { SimilarOwn } from "@/components/SimilarOwn";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
@@ -26,7 +28,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
   const current = modes.find((m) => m.key === selected);
   const modeByKey = new Map(modes.map((m) => [m.key, m]));
 
-  const [recs, wishlist] = await Promise.all([latestRecommendations(user.id, selected), rankWishlist(user.id)]);
+  const [recs, wishlist] = await Promise.all([latestRecommendations(user.id, selected), rankWishlist(user.id, user.platforms)]);
   const { data: fb } = recs.length
     ? await db().from("rec_feedback").select("game_id, verdict").eq("user_id", user.id).in("game_id", recs.map((r) => r.games.id))
     : { data: [] };
@@ -44,6 +46,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
           Reagier einfach auf die Vorschläge: „Eher nicht“ drückt Ähnliches nach unten, „Klingt gut“ zieht es hoch.
           Falsche Begründungen? Das stellst du unter <Link href="/profile" className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-text">Geschmack</Link> ein.
         </p>
+        <PlatformScope platforms={user.platforms} />
       </div>
 
       {modes.length > 0 && (
@@ -93,6 +96,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
                             {!selected && mode && <span className="eyebrow">{mode.name}</span>}
                             {r.is_wildcard && <span className="chip !border-accent/50 !text-accent">Wildcard</span>}
                             {r.via_family && <span className="chip !border-good/40 !text-good">In deiner Steam-Familie</span>}
+                            <PlatformBadges game={r.games} mine={user.platforms} />
                           </div>
                           <Link href={`/games/${r.games.id}`} className="block font-display text-2xl font-semibold leading-tight hover:text-accent">
                             {r.games.title}

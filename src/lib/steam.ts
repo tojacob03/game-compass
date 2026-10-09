@@ -124,7 +124,17 @@ export async function getAppNames(appids: number[]): Promise<Map<number, string>
   return names;
 }
 
-export type SteamAssets = { appid: number; header: string | null; capsule: string | null; hero: string | null };
+export type SteamAssets = {
+  appid: number;
+  header: string | null;
+  capsule: string | null;
+  hero: string | null;
+  // Plattformen (fehlen, wenn Steam keine Daten liefert)
+  windows?: boolean;
+  mac?: boolean;
+  linux?: boolean;
+  deck?: number;
+};
 
 /**
  * Echte Bild-URLs aus dem Store (bis zu 100 Spiele pro Aufruf). Neuere Spiele haben Hash-Pfade –
@@ -137,12 +147,13 @@ export async function getAssets(appids: number[]): Promise<SteamAssets[]> {
     const input = {
       ids: appids.slice(i, i + 100).map((appid) => ({ appid })),
       context: { language: "english", country_code: env().STEAM_COUNTRY },
-      data_request: { include_assets: true },
+      data_request: { include_assets: true, include_platforms: true },
     };
     type Item = {
       appid?: number;
       id: number;
       assets?: { asset_url_format?: string; header?: string; library_capsule?: string; library_hero?: string; main_capsule?: string };
+      platforms?: { windows?: boolean; mac?: boolean; steamos_linux?: boolean; steam_deck_compat_category?: number };
     };
     try {
       const data = await getJson<{ response: { store_items?: Item[] } }>(
@@ -151,7 +162,14 @@ export async function getAssets(appids: number[]): Promise<SteamAssets[]> {
       for (const it of data.response.store_items ?? []) {
         const a = it.assets;
         const url = (file?: string) => (a?.asset_url_format && file ? base + a.asset_url_format.replace("${FILENAME}", file) : null);
-        out.push({ appid: it.appid ?? it.id, header: url(a?.header) ?? url(a?.main_capsule), capsule: url(a?.library_capsule), hero: url(a?.library_hero) });
+        const p = it.platforms;
+        out.push({
+          appid: it.appid ?? it.id,
+          header: url(a?.header) ?? url(a?.main_capsule),
+          capsule: url(a?.library_capsule),
+          hero: url(a?.library_hero),
+          ...(p ? { windows: !!p.windows, mac: !!p.mac, linux: !!p.steamos_linux, deck: p.steam_deck_compat_category ?? 0 } : {}),
+        });
       }
     } catch (e) {
       console.warn("Steam-Assets konnten nicht geladen werden", e);

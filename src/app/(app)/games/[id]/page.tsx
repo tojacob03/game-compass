@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ScoreBadge } from "@/components/GameCard";
+import { PlatformBadges } from "@/components/PlatformBadges";
 import { RatingForm } from "@/components/RatingForm";
+import { PLATFORM_COLUMNS } from "@/lib/platforms";
 import { SimilarOwn } from "@/components/SimilarOwn";
 import { parsePgVector } from "@/lib/gemini";
 import { imagesForIds } from "@/lib/queries";
@@ -24,7 +26,7 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
   const { data: g } = await db()
     .from("games")
     .select(
-      "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes, essence_embedding",
+      `id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, developers, release_year, review_positive, review_negative, essence, analyzed_at, analysis_error, chips, median_playtime_minutes, essence_embedding, ${PLATFORM_COLUMNS}`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -74,6 +76,7 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
               </a>
             )}
           </div>
+          <PlatformBadges game={game} mine={user.platforms} />
           {game.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {game.tags.slice(0, 12).map((t) => (

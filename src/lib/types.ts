@@ -6,6 +6,7 @@ export type UserRow = {
   status: "pending" | "active" | "blocked";
   is_admin: boolean;
   about_me: string | null;
+  platforms: string[]; // worauf die Person spielt (windows, mac, linux, deck, gfn)
   last_synced_at: string | null;
   created_at: string;
 };
@@ -35,6 +36,12 @@ export type GameRow = {
   capsule_image: string | null; // Hochformat-Cover
   hero_image: string | null;
   chips: GameChips | null;
+  plat_windows: boolean | null;
+  plat_mac: boolean | null;
+  plat_linux: boolean | null;
+  deck_compat: number | null;
+  gfn_store: string | null;
+  platforms_fetched_at: string | null;
 };
 
 export type GameChips = { loved: string[]; criticized: string[]; endless: boolean };
@@ -60,7 +67,7 @@ export type UserGameRow = {
 
 /** Spalten, die für Listen reichen (ohne große Texte/Embeddings). */
 export const GAME_LIST_COLUMNS =
-  "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, release_year, review_positive, review_negative, analyzed_at, analysis_error";
+  "id, steam_appid, title, header_image, capsule_image, hero_image, short_description, genres, tags, release_year, review_positive, review_negative, analyzed_at, analysis_error, plat_windows, plat_mac, plat_linux, deck_compat, gfn_store, platforms_fetched_at";
 
 export type GameListItem = Pick<
   GameRow,
@@ -78,4 +85,10 @@ export type GameListItem = Pick<
   | "review_negative"
   | "analyzed_at"
   | "analysis_error"
+  | "plat_windows"
+  | "plat_mac"
+  | "plat_linux"
+  | "deck_compat"
+  | "gfn_store"
+  | "platforms_fetched_at"
 >;

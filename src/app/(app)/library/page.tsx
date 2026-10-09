@@ -7,6 +7,19 @@ import { ENGAGEMENT_STYLE, engagementOf } from "@/lib/engagement";
 import { db, fetchAll, must, selectInChunks } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { GAME_LIST_COLUMNS, type GameListItem } from "@/lib/types";
+import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
+import { PlatformBadges } from "@/components/PlatformBadges";
+
+/** Plattform-Filter als Supabase-Bedingung (prefix = "games." bei verschachtelter Abfrage). */
+type Filterable = { eq(c: string, v: unknown): Filterable; gte(c: string, v: unknown): Filterable; not(c: string, op: string, v: unknown): Filterable };
+function platformFilter<Q>(query: Q, key: PlatformKey | null, prefix = ""): Q {
+  const q = query as unknown as Filterable;
+  if (key === "mac") return q.eq(`${prefix}plat_mac`, true) as unknown as Q;
+  if (key === "linux") return q.eq(`${prefix}plat_linux`, true) as unknown as Q;
+  if (key === "deck") return q.gte(`${prefix}deck_compat`, 2) as unknown as Q;
+  if (key === "gfn") return q.not(`${prefix}gfn_store`, "is", null) as unknown as Q;
+  return query;
+}
 
 const TABS = [
   { id: "owned", label: "Steam" },
@@ -35,6 +48,8 @@ export default async function Library(props: PageProps<"/library">) {
   const sp = await props.searchParams;
   const tab: Tab = TABS.some((t) => t.id === sp.tab) ? (sp.tab as Tab) : "owned";
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
+  const plat = PLATFORMS.some((p) => p.key === sp.p && p.key !== "windows") ? (sp.p as PlatformKey) : null;
+  const href = (t: string, p: PlatformKey | null) => `/library?tab=${t}${q ? `&q=${encodeURIComponent(q)}` : ""}${p ? `&p=${p}` : ""}`;
   const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 
   let rows: Row[] = [];
@@ -48,7 +63,7 @@ export default async function Library(props: PageProps<"/library">) {
         await selectInChunks<GameListItem>(
           famRows.map((f) => f.game_id),
           (chunk) => {
-            let gq = db().from("games").select(GAME_LIST_COLUMNS).in("id", chunk);
+            let gq = platformFilter(db().from("games").select(GAME_LIST_COLUMNS).in("id", chunk), plat);
             if (q) gq = gq.ilike("title", pattern);
             return gq as unknown as PromiseLike<{ data: GameListItem[] | null; error: { message: string } | null }>;
           },
@@ -71,6 +86,7 @@ export default async function Library(props: PageProps<"/library">) {
     if (tab === "other") uq = uq.eq("manual", true).order("updated_at", { ascending: false });
     if (tab === "rated") uq = uq.not("score", "is", null).order("score", { ascending: false });
     if (q) uq = uq.ilike("games.title", pattern);
+    uq = platformFilter(uq, plat, "games.");
     rows = must(await uq, "library") as unknown as Row[];
   }
 
@@ -80,15 +96,33 @@ export default async function Library(props: PageProps<"/library">) {
         <h1 className="h1">Bibliothek</h1>
         <form action="/library" className="w-full sm:w-64">
           <input type="hidden" name="tab" value={tab} />
+          {plat && <input type="hidden" name="p" value={plat} />}
           <input name="q" defaultValue={q} className="input" placeholder="Suchen …" />
         </form>
       </div>
       <AnimatedTabs
         id="library"
         active={tab}
-        items={TABS.map((t) => ({ key: t.id, href: `/library?tab=${t.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`, label: t.label }))}
+        items={TABS.map((t) => ({ key: t.id, href: href(t.id, plat), label: t.label }))}
       />
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="mr-1 text-muted">Läuft auf</span>
+        {[null, ...PLATFORMS.filter((p) => p.key !== "windows").map((p) => p.key)].map((k) => (
+          <Link
+            key={k ?? "alle"}
+            href={href(tab, k)}
+            className={`rounded-full border px-2.5 py-1 transition ${plat === k ? "border-text/50 text-text" : "border-line text-muted hover:text-text"}`}
+          >
+            {k ? PLATFORMS.find((p) => p.key === k)!.label : "Alles"}
+          </Link>
+        ))}
+      </div>
 
+      {plat === "gfn" && (
+        <p className="text-xs text-muted">
+          GeForce NOW laut offizieller NVIDIA-Liste. Steht „GFN · Epic“ o. ä. am Spiel, läuft es dort nur mit der Version aus diesem Shop.
+        </p>
+      )}
       <p className="text-sm text-muted">
         Tipp ein Spiel an, um es ausführlich zu bewerten: Note 1–10, was gepackt und was gestört hat, eigene Worte. Für viele
         Spiele auf einmal geht&apos;s schneller unter{" "}
@@ -125,7 +159,12 @@ export default async function Library(props: PageProps<"/library">) {
                   <span className="rounded-lg border border-white/20 bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white/90 backdrop-blur">Bewerten</span>
                 ) : undefined
               }
-              meta={r.owners ? `von ${r.owners.join(", ")}` : <LibraryMeta row={r} />}
+              meta={
+                <>
+                  {r.owners ? `von ${r.owners.join(", ")}` : <LibraryMeta row={r} />}
+                  {plat && <PlatformBadges game={r.games} mine={[plat]} className="mt-1" />}
+                </>
+              }
             />
           ))}
         </div>

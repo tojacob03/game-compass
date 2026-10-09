@@ -4,7 +4,9 @@ import { catalogMean, similarOwnGames } from "./similar";
 import { db, fetchAll, must } from "./db";
 import { enqueueAnalysis, upsertSteamGame } from "./games";
 import { cosine, generateJson, parsePgVector, toPgVector } from "./gemini";
+import { ensureGfnFresh } from "./gfn";
 import { buildPersonalScorer } from "./personal";
+import { normalizePlatforms, PLATFORM_COLUMNS, playableOn, type PlatformInfo } from "./platforms";
 import { LateralProposalsSchema, RerankSchema, type Essence, type StoredTasteProfile } from "./schemas";
 import { HttpError } from "./session";
 import { getSteamSpy, getSteamSpyTag, normalizeTitle, searchStore } from "./steam";
@@ -364,15 +366,24 @@ export async function prepareRecommendations(user: UserRow, requestedMode: strin
     console.warn("Tag-Kandidaten fehlgeschlagen", err);
   }
 
+  // Plattformen (Steam: Mac/Linux/Deck, NVIDIA: GeForce NOW) holen und nicht Spielbares aussortieren –
+  // VOR der Analyse, damit kein KI-Kontingent für Spiele draufgeht, die die Person gar nicht spielen kann
+  const platforms = normalizePlatforms(user.platforms);
+  await ensureGfnFresh().catch((e) => console.warn("GeForce NOW", e));
+  await refreshMissingAssets([...sources.keys()]).catch((e) => console.warn("Assets", e));
+  const allIds = [...sources.keys()];
+  const status = (
+    allIds.length
+      ? (must(await db().from("games").select(`id, analyzed_at, analysis_attempts, ${PLATFORM_COLUMNS}`).in("id", allIds), "games.status") as ({
+          id: string;
+          analyzed_at: string | null;
+          analysis_attempts: number;
+        } & PlatformInfo)[])
+      : []
+  ).filter((g) => playableOn(g, platforms));
+  const ids = status.map((g) => g.id);
+
   // Noch nicht analysierte Kandidaten: feste Quote pro Quelle, damit keine Quelle dominiert
-  const ids = [...sources.keys()];
-  const status = ids.length
-    ? (must(await db().from("games").select("id, analyzed_at, analysis_attempts").in("id", ids), "games.status") as {
-        id: string;
-        analyzed_at: string | null;
-        analysis_attempts: number;
-      }[])
-    : [];
   const unanalyzed = status.filter((g) => !g.analyzed_at && g.analysis_attempts < 3);
   const budget = { ...NEW_PER_SOURCE };
   const toAnalyze: string[] = [];
@@ -389,7 +400,6 @@ export async function prepareRecommendations(user: UserRow, requestedMode: strin
   );
 
   const candidateIds = ids.filter((id) => !dropped.has(id));
-  await refreshMissingAssets(candidateIds).catch((e) => console.warn("Assets", e));
   const run = must(
     await db()
       .from("recommendation_runs")
@@ -480,14 +490,15 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
     ? (must(
         await db()
           .from("games")
-          .select("id, title, release_year, review_positive, review_negative, essence, essence_embedding")
+          .select(`id, title, release_year, review_positive, review_negative, essence, essence_embedding, ${PLATFORM_COLUMNS}`)
           .in("id", run.candidate_ids)
           .not("essence_embedding", "is", null),
         "games.candidates",
-      ) as (Omit<Candidate, "vector"> & { essence_embedding: unknown })[])
+      ) as (Omit<Candidate, "vector"> & { essence_embedding: unknown } & PlatformInfo)[])
     : [];
+  const platforms = normalizePlatforms(user.platforms);
   const candidates: Candidate[] = rows
-    .filter((r) => !known.gameIds.has(r.id))
+    .filter((r) => !known.gameIds.has(r.id) && playableOn(r, platforms))
     .map((r) => ({ ...r, vector: parsePgVector(r.essence_embedding) ?? [] }));
   if (!candidates.length) {
     await db().from("recommendation_runs").update({ status: "failed", error: "Keine Kandidaten" }).eq("id", runId);
@@ -609,7 +620,7 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
 }
 
 /** Wunschliste nach Passung sortieren (Ähnlichkeit wird in der DB berechnet, keine KI-Kosten). */
-export async function rankWishlist(userId: string) {
+export async function rankWishlist(userId: string, platforms: string[] = []) {
   const intents = await loadIntents(userId);
   if (!intents.length) return [];
   const ranked = must(
@@ -624,10 +635,10 @@ export async function rankWishlist(userId: string) {
   const games = must(
     await db()
       .from("games")
-      .select("id, title, header_image, capsule_image, steam_appid, review_positive, review_negative")
+      .select(`id, title, header_image, capsule_image, steam_appid, review_positive, review_negative, ${PLATFORM_COLUMNS}`)
       .in("id", ranked.map((r) => r.game_id)),
     "wishlist.games",
-  ) as {
+  ) as ({
     id: string;
     title: string;
     header_image: string | null;
@@ -635,10 +646,10 @@ export async function rankWishlist(userId: string) {
     steam_appid: number | null;
     review_positive: number | null;
     review_negative: number | null;
-  }[];
+  } & PlatformInfo)[];
   const byId = new Map(games.map((g) => [g.id, g]));
   return ranked
-    .filter((r) => byId.has(r.game_id))
+    .filter((r) => byId.has(r.game_id) && playableOn(byId.get(r.game_id)!, platforms))
     .map((r) => {
       const game = byId.get(r.game_id)!;
       const intent = intents[r.best_idx - 1];

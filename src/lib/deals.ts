@@ -4,6 +4,9 @@ import { env } from "./env";
 import { parsePgVector } from "./gemini";
 import { getBundles, getPrices, ItadError, itadConfigured, lookupSteamApps, STEAM_SHOP_ID, type ItadBundle, type ItadDeal, type Money } from "./itad";
 import { buildPersonalScorer } from "./personal";
+import { ensureGfnFresh } from "./gfn";
+import { refreshMissingAssets } from "./assets";
+import { normalizePlatforms, PLATFORM_COLUMNS, playableOn, type PlatformInfo } from "./platforms";
 import { loadIntents, scoreCandidate, wilson } from "./recommend";
 import { getTasteProfile } from "./taste";
 import type { UserRow } from "./types";
@@ -48,7 +51,15 @@ async function mapLimit<T>(items: T[], limit: number, fn: (t: T) => Promise<void
   );
 }
 
-type GameInfo = { id: string; title: string; steam_appid: number | null; itad_id: string | null; itad_checked_at: string | null; capsule_image: string | null; header_image: string | null };
+type GameInfo = {
+  id: string;
+  title: string;
+  steam_appid: number | null;
+  itad_id: string | null;
+  itad_checked_at: string | null;
+  capsule_image: string | null;
+  header_image: string | null;
+} & PlatformInfo;
 
 /** ITAD-IDs für Spiele mit Steam-AppID nachschlagen (einmalig pro Spiel). */
 async function ensureItadIds(games: GameInfo[]) {
@@ -133,7 +144,7 @@ async function refreshBundles(games: GameInfo[], rows: Map<string, PriceRow>, co
 }
 
 export type DealItem = {
-  game: { id: string; title: string; capsule_image: string | null; header_image: string | null; steam_appid: number | null };
+  game: { id: string; title: string; capsule_image: string | null; header_image: string | null; steam_appid: number | null } & PlatformInfo;
   fit: number | null;
   modeKey: string | null;
   wishlisted: boolean;
@@ -238,15 +249,21 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
   const familyCount = wanted.filter((id) => family.has(id)).length;
   const candidateIds = wanted.filter((id) => !family.has(id)).slice(0, 300);
 
-  const games = await selectInChunks<GameInfo>(
-    candidateIds,
-    (chunk) =>
-      db().from("games").select("id, title, steam_appid, itad_id, itad_checked_at, capsule_image, header_image").in("id", chunk) as unknown as PromiseLike<{
-        data: GameInfo[] | null;
-        error: { message: string } | null;
-      }>,
-    "deals.games",
-  );
+  // Nur, was auf den Plattformen der Person läuft
+  const platforms = normalizePlatforms(user.platforms);
+  await ensureGfnFresh().catch((e) => console.warn("GeForce NOW", e));
+  await refreshMissingAssets(candidateIds).catch((e) => console.warn("Assets", e));
+  const games = (
+    await selectInChunks<GameInfo>(
+      candidateIds,
+      (chunk) =>
+        db().from("games").select(`id, title, steam_appid, itad_id, itad_checked_at, capsule_image, header_image, ${PLATFORM_COLUMNS}`).in("id", chunk) as unknown as PromiseLike<{
+          data: GameInfo[] | null;
+          error: { message: string } | null;
+        }>,
+      "deals.games",
+    )
+  ).filter((g) => playableOn(g, platforms));
 
   let error: string | undefined;
   const rows = new Map((await loadPriceRows(candidateIds)).map((r) => [r.game_id, r]));
@@ -278,7 +295,19 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
       (wishlist.has(g.id) ? 1.12 : 1) *
       (recommended.has(g.id) ? 1.06 : 1);
     deals.push({
-      game: { id: g.id, title: g.title, capsule_image: g.capsule_image, header_image: g.header_image, steam_appid: g.steam_appid },
+      game: {
+        id: g.id,
+        title: g.title,
+        capsule_image: g.capsule_image,
+        header_image: g.header_image,
+        steam_appid: g.steam_appid,
+        plat_windows: g.plat_windows,
+        plat_mac: g.plat_mac,
+        plat_linux: g.plat_linux,
+        deck_compat: g.deck_compat,
+        gfn_store: g.gfn_store,
+        platforms_fetched_at: g.platforms_fetched_at,
+      },
       fit: f,
       modeKey: modeOf.get(g.id) ?? null,
       wishlisted: wishlist.has(g.id),

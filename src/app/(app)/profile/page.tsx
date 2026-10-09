@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AnchorStrip } from "@/components/ModeCards";
 import { Reveal } from "@/components/ui/Reveal";
 import { BeamDot, TracingBeam } from "@/components/ui/TracingBeam";
+import { PlatformPicker } from "@/components/PlatformPicker";
+import { normalizePlatforms } from "@/lib/platforms";
 import { AboutMeForm, EvalRunner, RebuildProfileButton } from "@/components/ProfileActions";
 import { AddFacet, FacetControls, RejectedList } from "@/components/ProfileCorrections";
 import { loadCorrections } from "@/lib/corrections";
@@ -37,6 +39,17 @@ export default async function Profile() {
           )}
         </div>
       </div>
+
+      <section id="plattformen" className="card scroll-mt-24 space-y-3 p-5">
+        <div>
+          <h2 className="h2">Worauf spielst du?</h2>
+          <p className="text-sm text-muted">
+            Empfehlungen, Deals, Wunschliste und Chat zeigen nur Spiele, die auf mindestens einer dieser Plattformen laufen.
+            GeForce NOW laut offizieller NVIDIA-Liste, Steam Deck ab „spielbar“.
+          </p>
+        </div>
+        <PlatformPicker initial={normalizePlatforms(user.platforms)} />
+      </section>
 
       {p && (
         <>

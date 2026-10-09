@@ -3,6 +3,7 @@ import { Type, type Content, type FunctionDeclaration, type Part } from "@google
 import { db, fetchAll, must, selectInChunks } from "./db";
 import { analyzeGame, upsertSteamGame } from "./games";
 import { chatStep, cosine, embed, parsePgVector, toPgVector } from "./gemini";
+import { normalizePlatforms, PLATFORM_COLUMNS, platformLabel, platformSummary, playableOn, type PlatformInfo } from "./platforms";
 import type { Essence } from "./schemas";
 import { normalizeTitle, searchStore } from "./steam";
 import { compactEssence, getTasteProfile, markProfileStale, profileForPrompt } from "./taste";
@@ -110,13 +111,13 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         hits = rows
           .map((r) => ({ game_id: r.id, similarity: cosine(vec, parsePgVector(r.essence_embedding)!) }))
           .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 8);
+          .slice(0, 20);
       } else {
         const { data } = await db().rpc("match_my_games", {
           p_user: userId,
           p_query: toPgVector(vec),
           p_filter: filter,
-          p_count: 8,
+          p_count: 20,
         });
         hits = (data ?? []) as typeof hits;
       }
@@ -124,10 +125,14 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       const games = must(
         await db()
           .from("games")
-          .select("id, title, header_image, steam_appid, essence")
+          .select(`id, title, header_image, steam_appid, essence, ${PLATFORM_COLUMNS}`)
           .in("id", hits.map((h) => h.game_id)),
         "games.hits",
-      ) as (Pick<GameRow, "id" | "title" | "header_image" | "steam_appid"> & { essence: Essence })[];
+      ) as (Pick<GameRow, "id" | "title" | "header_image" | "steam_appid"> & { essence: Essence } & PlatformInfo)[];
+      // Nur, was auf den Plattformen der Person läuft
+      const platforms = normalizePlatforms(ctx.user.platforms);
+      hits = hits.filter((h) => playableOn(games.find((x) => x.id === h.game_id) ?? {}, platforms)).slice(0, 8);
+      if (!hits.length) return { result: "Nichts Passendes, das auf den Plattformen der Person läuft." };
       const rel = must(
         await db()
           .from("user_games")
@@ -147,28 +152,31 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
           playtime_hours: r ? Math.round(r.playtime_minutes / 60) : 0,
           status: r?.status ?? null,
           own_score: r?.score ?? null,
+          platforms: platformSummary(g),
           essence: compactEssence(g.essence, 400),
         };
       });
     }
     case "find_new_games": {
       const [vec] = await embed([String(args.description ?? "")]);
-      const { data } = await db().rpc("match_new_games", { p_user: userId, p_query: toPgVector(vec), p_count: 8 });
-      const hits = (data ?? []) as { game_id: string; similarity: number }[];
+      const { data } = await db().rpc("match_new_games", { p_user: userId, p_query: toPgVector(vec), p_count: 20 });
+      let hits = (data ?? []) as { game_id: string; similarity: number }[];
       if (!hits.length) return { result: "Katalog noch klein – nutze dein Wissen und prüfe Titel mit lookup_game." };
       const games = must(
         await db()
           .from("games")
-          .select("id, title, header_image, steam_appid, essence, review_positive, review_negative")
+          .select(`id, title, header_image, steam_appid, essence, review_positive, review_negative, ${PLATFORM_COLUMNS}`)
           .in("id", hits.map((h) => h.game_id)),
         "games.new",
       ) as (Pick<GameRow, "id" | "title" | "header_image" | "steam_appid" | "review_positive" | "review_negative"> & {
         essence: Essence;
-      })[];
+      } & PlatformInfo)[];
+      const platforms = normalizePlatforms(ctx.user.platforms);
+      hits = hits.filter((h) => playableOn(games.find((x) => x.id === h.game_id) ?? {}, platforms)).slice(0, 8);
       return hits.map((h) => {
         const g = games.find((x) => x.id === h.game_id)!;
         remember(ctx, g);
-        return { title: g.title, match: Math.round(h.similarity * 100), essence: compactEssence(g.essence, 500) };
+        return { title: g.title, match: Math.round(h.similarity * 100), platforms: platformSummary(g), essence: compactEssence(g.essence, 500) };
       });
     }
     case "lookup_game": {
@@ -182,7 +190,14 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         .eq("user_id", userId)
         .eq("game_id", game.id)
         .maybeSingle();
-      return { title: game.title, year: game.release_year, essence: game.essence, relation_to_user: rel ?? "unbekannt" };
+      const { data: plat } = await db().from("games").select(PLATFORM_COLUMNS).eq("id", game.id).maybeSingle();
+      return {
+        title: game.title,
+        year: game.release_year,
+        platforms: platformSummary((plat ?? {}) as PlatformInfo),
+        essence: game.essence,
+        relation_to_user: rel ?? "unbekannt",
+      };
     }
     case "get_latest_recommendations": {
       const recs = must(
@@ -233,6 +248,10 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
 
 function systemPrompt(user: UserRow, profileText: string | null) {
   return `Du bist "Compass", ein ehrlicher, begeisterungsfähiger Spiele-Berater für ${user.display_name}. Heute ist ${new Date().toLocaleDateString("de-DE")}.
+
+# Plattformen
+${user.display_name} spielt auf: ${normalizePlatforms(user.platforms).map((k) => platformLabel(k)).join(", ")}.
+Empfiehl nur Spiele, die dort laufen (Tool-Ergebnisse enthalten "platforms"; GFN = GeForce NOW, "über Epic" = dort nur mit Epic-Version).
 
 ${profileText ? `# Geschmacksprofil\n${profileText}` : "Es gibt noch kein Geschmacksprofil – frag nach Lieblingsspielen und was daran begeistert."}
 

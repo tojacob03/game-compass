@@ -1,6 +1,9 @@
 import { ArrowUpRight, Package } from "lucide-react";
 import Link from "next/link";
+import { PlatformBadges } from "@/components/PlatformBadges";
+import { PlatformScope } from "@/components/PlatformScope";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
+import { normalizePlatforms, platformLabel, supports, type PlatformKey } from "@/lib/platforms";
 import { FitRing } from "@/components/ui/FitRing";
 import { GameImage } from "@/components/ui/GameImage";
 import { Reveal } from "@/components/ui/Reveal";
@@ -31,8 +34,13 @@ export default async function Deals(props: PageProps<"/deals">) {
   const [result, tp] = await Promise.all([findDeals(user), getTasteProfile(user.id)]);
   const modeName = new Map((tp?.profile.modes ?? []).map((m) => [m.key, m.name]));
 
+  // Mehrere eigene Plattformen: optional auf eine eingrenzen (z. B. nur GeForce NOW)
+  const mine = normalizePlatforms(user.platforms);
+  const only = typeof sp.p === "string" && mine.includes(sp.p as PlatformKey) ? (sp.p as PlatformKey) : null;
+  const qs = (f: string, p: string | null) => `/deals?f=${f}${p ? `&p=${p}` : ""}`;
   const pass = (d: DealItem) =>
-    filter === "wunschliste" ? d.wishlisted : filter === "unter10" ? d.best.price.amount < 10 : filter === "unter20" ? d.best.price.amount < 20 : true;
+    (!only || supports(d.game, only) !== false) &&
+    (filter === "wunschliste" ? d.wishlisted : filter === "unter10" ? d.best.price.amount < 10 : filter === "unter20" ? d.best.price.amount < 20 : true);
   const deals = result.deals.filter(pass).slice(0, 24);
 
   return (
@@ -47,6 +55,7 @@ export default async function Deals(props: PageProps<"/deals">) {
           dem Katalog – über alle offiziellen Shops, mit Allzeittief-Vergleich. Was du schon hast oder über deine Steam-Familie spielen
           kannst, fliegt raus.
         </p>
+        <PlatformScope platforms={user.platforms} />
       </div>
 
       {!result.configured ? (
@@ -60,7 +69,22 @@ export default async function Deals(props: PageProps<"/deals">) {
         </section>
       ) : (
         <>
-          <AnimatedTabs id="deals" active={filter} items={FILTERS.map((f) => ({ key: f.key, href: `/deals?f=${f.key}`, label: f.label }))} />
+          <div className="space-y-3">
+            <AnimatedTabs id="deals" active={filter} items={FILTERS.map((f) => ({ key: f.key, href: qs(f.key, only), label: f.label }))} />
+            {mine.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {[null, ...mine].map((k) => (
+                  <Link
+                    key={k ?? "alle"}
+                    href={qs(filter, k)}
+                    className={`rounded-full border px-2.5 py-1 transition ${only === k ? "border-text/50 text-text" : "border-line text-muted hover:text-text"}`}
+                  >
+                    {k ? `Nur ${platformLabel(k)}` : "Alle meine Plattformen"}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
           {result.error && <p className="text-sm text-bad">{result.error}</p>}
 
           {deals.length === 0 ? (
@@ -110,6 +134,15 @@ export default async function Deals(props: PageProps<"/deals">) {
                           {d.nearLow ? " · 12-Monats-Tief" : ""}
                         </span>
                       ) : null}
+                      <PlatformBadges game={d.game} mine={mine} />
+                      {d.game.gfn_store &&
+                        d.game.gfn_store !== "Steam" &&
+                        mine.includes("gfn") &&
+                        !mine.some((k) => k !== "gfn" && supports(d.game, k)) && (
+                          <span className="chip !border-bad/50 !text-bad">
+                            Für GeForce NOW {d.game.gfn_store === "?" ? "andere Shop-Version" : `${d.game.gfn_store}-Version`} kaufen
+                          </span>
+                        )}
                       {d.wishlisted && <span className="chip">Wunschliste</span>}
                       {d.recommended && <span className="chip">Empfohlen</span>}
                       {d.best.voucher && <span className="chip">Code: {d.best.voucher}</span>}
