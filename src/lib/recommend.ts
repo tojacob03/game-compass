@@ -132,7 +132,7 @@ async function adjustByFeedback(userId: string, intents: Intent[]): Promise<Inte
 }
 
 /** Alles, was der Nutzer schon kennt oder abgelehnt hat. */
-async function knownSets(userId: string) {
+export async function knownSets(userId: string) {
   type LibRow = {
     game_id: string;
     owned: boolean;
@@ -161,6 +161,21 @@ async function knownSets(userId: string) {
   for (const f of fb) if (f.verdict !== "interested") gameIds.add(f.game_id);
   const appids = new Set(known.map((r) => r.games.steam_appid).filter((a): a is number => a != null));
   const titles = known.map((r) => r.games.title);
+
+  // Steam-Familie: kann man schon spielen -> nie als neue Empfehlung (beeinflusst den Geschmack aber nicht)
+  const fam = await fetchAll<{ game_id: string }>((from, to) => db().rpc("family_library", { p_user: userId }).range(from, to), "family.known");
+  if (fam.length) {
+    const famGames = must(await db().from("games").select("id, steam_appid, title").in("id", fam.slice(0, 1000).map((f) => f.game_id)), "family.games") as {
+      id: string;
+      steam_appid: number | null;
+      title: string;
+    }[];
+    for (const g of famGames) {
+      gameIds.add(g.id);
+      if (g.steam_appid) appids.add(g.steam_appid);
+      titles.push(g.title);
+    }
+  }
   return { gameIds, appids, titles };
 }
 

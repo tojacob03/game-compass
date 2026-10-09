@@ -87,7 +87,10 @@ export default async function Library(props: PageProps<"/library">) {
         .sort((a, b) => a.title.localeCompare(b.title))
         .slice(0, LIMIT);
       const owners = new Map(famRows.map((f) => [f.game_id, f.owner_names]));
-      rows = games.map((g) => ({ playtime_minutes: 0, score: null, platform: "steam", games: g, owners: owners.get(g.id) }));
+      // Eigene Bewertungen von Familienspielen anzeigen (nur bewertete Familienspiele zählen für den Geschmack)
+      const { data: rated } = await db().from("user_games").select("game_id, score").eq("user_id", user.id).not("score", "is", null).in("game_id", games.map((g) => g.id));
+      const scores = new Map(((rated ?? []) as { game_id: string; score: number }[]).map((r) => [r.game_id, r.score]));
+      rows = games.map((g) => ({ playtime_minutes: 0, score: scores.get(g.id) ?? null, platform: "steam", games: g, owners: owners.get(g.id) }));
     }
   } else {
     let uq = db()
@@ -156,7 +159,9 @@ export default async function Library(props: PageProps<"/library">) {
         <div className="space-y-3">
           <FamilyManager members={familyMembers} appMembers={appMembers} />
           <p className="text-xs text-muted">
-            Unten: Spiele der anderen, die du nicht selbst besitzt. Nicht jedes Spiel ist auf Steam für Family Sharing freigegeben.
+            Unten: Spiele der anderen, die du nicht selbst besitzt. Sie tauchen nicht als Empfehlung oder Deal auf und beeinflussen deinen
+            Geschmack nicht – außer du hast eins gespielt und bewertest es (Spiel antippen). Nicht jedes Spiel ist auf Steam für Family
+            Sharing freigegeben.
             Wer GameCompass selbst nutzt, kann per Einladungscode unter{" "}
             <Link href="/groups" className="underline hover:text-text">
               Gruppen
@@ -174,7 +179,7 @@ export default async function Library(props: PageProps<"/library">) {
             <GameCard
               key={r.games.id}
               game={r.games}
-              href={r.score == null && r.playtime_minutes >= 60 ? `/games/${r.games.id}#bewerten` : undefined}
+              href={r.score == null && (r.playtime_minutes >= 60 || tab === "family") ? `/games/${r.games.id}#bewerten` : undefined}
               badge={
                 r.score != null ? (
                   <ScoreBadge score={r.score} />

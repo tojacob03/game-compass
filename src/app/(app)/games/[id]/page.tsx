@@ -33,11 +33,13 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
   if (!g) notFound();
   const game = g as unknown as GameRow;
 
-  const [{ data: rel }, { data: fr }, { data: queued }] = await Promise.all([
+  const [{ data: rel }, { data: fr }, { data: queued }, { data: fam }] = await Promise.all([
     db().from("user_games").select("*").eq("user_id", user.id).eq("game_id", id).maybeSingle(),
     db().rpc("group_ratings", { p_user: user.id }),
     db().from("analysis_queue").select("game_id").eq("game_id", id).eq("requested_by", user.id).maybeSingle(),
+    db().rpc("family_library", { p_user: user.id }),
   ]);
+  const familyOwners = ((fam ?? []) as { game_id: string; owner_names: string[] }[]).find((f) => f.game_id === id)?.owner_names ?? null;
   const ug = rel as UserGameRow | null;
   const friends = ((fr ?? []) as { game_id: string; rater_name: string; score: number; loved: string | null; disliked: string | null }[]).filter(
     (f) => f.game_id === id,
@@ -175,6 +177,12 @@ export default async function GamePage(props: PageProps<"/games/[id]">) {
               </span>
             ) : null}
           </div>
+          {familyOwners && ug?.score == null && (
+            <p className="rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-sm text-muted">
+              Über deine Steam-Familie verfügbar (von {familyOwners.join(", ")}). Es zählt erst für deinen Geschmack, wenn du es hier
+              bewertest.
+            </p>
+          )}
           <RatingForm
             gameId={game.id}
             initial={{
