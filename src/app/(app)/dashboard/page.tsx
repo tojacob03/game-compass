@@ -58,17 +58,16 @@ export default async function Today() {
         ) : (
           <div className="card space-y-4 p-6" data-reveal>
             <p className="max-w-xl text-muted">
-              Noch kein Geschmacksprofil. Am schnellsten geht&apos;s so: Steam synchronisieren, ein paar Spiele kurz bewerten –
-              daraus erkennt GameCompass deine Spielmodi.
+              Noch kein Geschmacksprofil. Steam synchronisieren, falls du dort spielst – und dann ein paar Spiele bewerten, die du
+              kennst. Wenig oder gar nichts auf Steam? Kein Problem: Unter Bewerten tippst du einfach bekannte Spiele an, egal auf welcher
+              Plattform du sie gespielt hast.
             </p>
             <div className="flex flex-wrap items-start gap-3">
-              {!user.last_synced_at && <SyncButton />}
-              {user.last_synced_at && (
-                <Link href="/rate" className="btn-primary">
-                  Schnell bewerten
-                </Link>
-              )}
-              {user.last_synced_at && <RebuildProfileButton label="Profil erstellen" />}
+              {!user.last_synced_at && <SyncButton variant="ghost" />}
+              <Link href="/rate" className="btn-primary">
+                Spiele bewerten, die du kennst
+              </Link>
+              <RebuildProfileButton label="Profil erstellen" />
             </div>
           </div>
         )}
