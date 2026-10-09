@@ -2,7 +2,7 @@ import "server-only";
 import { db, fetchAll, must, selectInChunks } from "./db";
 import { env } from "./env";
 import { parsePgVector } from "./gemini";
-import { getBundles, getPrices, itadConfigured, lookupSteamApps, STEAM_SHOP_ID, type ItadBundle, type ItadDeal, type Money } from "./itad";
+import { getBundles, getPrices, ItadError, itadConfigured, lookupSteamApps, STEAM_SHOP_ID, type ItadBundle, type ItadDeal, type Money } from "./itad";
 import { buildPersonalScorer } from "./personal";
 import { loadIntents, scoreCandidate, wilson } from "./recommend";
 import { getTasteProfile } from "./taste";
@@ -256,8 +256,8 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
     const byFit = [...games].filter((g) => g.itad_id).sort((a, b) => (fit.get(b.id) ?? (wishlist.has(b.id) ? 60 : 0)) - (fit.get(a.id) ?? (wishlist.has(a.id) ? 60 : 0)));
     await refreshBundles(byFit.slice(0, BUNDLE_LOOKUPS), rows, country);
   } catch (e) {
-    console.warn("Deals", e);
-    error = "IsThereAnyDeal ist gerade nicht erreichbar – zeige zwischengespeicherte Preise.";
+    console.error("Deals: IsThereAnyDeal-Fehler", e instanceof Error ? e.message : e);
+    error = itadErrorMessage(e);
   }
 
   // Einzel-Angebote
@@ -325,6 +325,17 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
 
   const updatedAt = [...rows.values()].reduce<string | null>((max, r) => (!max || r.fetched_at > max ? r.fetched_at : max), null);
   return { configured: true, deals: deals.slice(0, 40), bundles: bundles.slice(0, 8), familyCount, checked: games.filter((g) => g.itad_id).length, updatedAt, error };
+}
+
+function itadErrorMessage(e: unknown): string {
+  const stale = " Angezeigt werden zwischengespeicherte Preise, falls vorhanden.";
+  if (e instanceof ItadError && (e.status === 401 || e.status === 403)) {
+    return `IsThereAnyDeal lehnt den API-Key ab (${e.status}). Prüf ITAD_API_KEY in Vercel: Es muss der „API Key“ deiner App sein (nicht Client-ID oder Secret), ohne Anführungszeichen – danach neu deployen.${stale}`;
+  }
+  if (e instanceof ItadError && e.status === 429) return `IsThereAnyDeal: zu viele Anfragen, bitte in ein paar Minuten nochmal.${stale}`;
+  if (e instanceof ItadError) return `IsThereAnyDeal antwortet mit Fehler ${e.status}.${stale}`;
+  if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) return `IsThereAnyDeal antwortet gerade nicht (Zeitüberschreitung).${stale}`;
+  return `Preise konnten nicht aktualisiert werden: ${e instanceof Error ? e.message.slice(0, 160) : "unbekannter Fehler"}.${stale}`;
 }
 
 /** "Bei Instant Gaming suchen" – öffnet die Suche im Browser der Person (kein Scraping), mit Empfehlungscode. */

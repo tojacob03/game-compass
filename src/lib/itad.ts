@@ -32,6 +32,12 @@ export type ItadBundle = {
   tiers: { price: Money | null; games: { id: string; title: string; type: string | null }[] }[];
 };
 
+export class ItadError extends Error {
+  constructor(public status: number, path: string) {
+    super(`IsThereAnyDeal ${status} für ${path}`);
+  }
+}
+
 export const itadConfigured = () => !!env().ITAD_API_KEY;
 
 async function itad<T>(path: string, init: { method?: "GET" | "POST"; query?: Record<string, string>; body?: unknown } = {}): Promise<T> {
@@ -45,7 +51,7 @@ async function itad<T>(path: string, init: { method?: "GET" | "POST"; query?: Re
     signal: AbortSignal.timeout(15000),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`IsThereAnyDeal ${res.status} für ${path}`);
+  if (!res.ok) throw new ItadError(res.status, path);
   return (await res.json()) as T;
 }
 

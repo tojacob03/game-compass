@@ -19,7 +19,8 @@ const schema = z.object({
   ITAD_API_KEY: z
     .string()
     .optional()
-    .transform((v) => v?.trim() || undefined),
+    // Leerzeichen und versehentlich mitkopierte Anführungszeichen entfernen
+    .transform((v) => v?.trim().replace(/^["']|["']$/g, "") || undefined),
   INSTANT_GAMING_REF: z.string().default("gamer-81a1cce"),
 });
 
