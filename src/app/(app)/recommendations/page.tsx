@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FeedbackButtons } from "@/components/FeedbackButtons";
 import { PlatformBadges } from "@/components/PlatformBadges";
-import { PlatformScope } from "@/components/PlatformScope";
+import { PlatformFilter, PlatformScope } from "@/components/PlatformScope";
+import { fallbackLabel, matchesView, parseViewFilter, prefsOf, reachOf, type ViewFilter } from "@/lib/platforms";
 import { RecommendationRunner } from "@/components/RecommendationRunner";
 import { SimilarOwn } from "@/components/SimilarOwn";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
@@ -27,14 +28,19 @@ export default async function Discover(props: PageProps<"/recommendations">) {
   const selected: string | null = param && modes.some((m) => m.key === param) ? param : null;
   const current = modes.find((m) => m.key === selected);
   const modeByKey = new Map(modes.map((m) => [m.key, m]));
+  const prefs = prefsOf(user);
+  const view = parseViewFilter(sp.p);
+  const href = (mode: string, p: ViewFilter | null) => `/recommendations?mode=${encodeURIComponent(mode)}${p ? `&p=${p}` : ""}`;
 
-  const [recs, wishlist] = await Promise.all([latestRecommendations(user.id, selected), rankWishlist(user.id, user.platforms)]);
+  const [allRecs, wishlist] = await Promise.all([latestRecommendations(user.id, selected), rankWishlist(user.id)]);
+  // Plattform-Filter nur, wenn die Person ihn antippt
+  const recs = allRecs.filter((r) => matchesView(r.games, view, prefs));
   const { data: fb } = recs.length
     ? await db().from("rec_feedback").select("game_id, verdict").eq("user_id", user.id).in("game_id", recs.map((r) => r.games.id))
     : { data: [] };
   const verdicts = new Map(((fb ?? []) as { game_id: string; verdict: Verdict }[]).map((f) => [f.game_id, f.verdict]));
   const similarImages = await imagesForIds(recs.flatMap((r) => (r.similar_to ?? []).map((x) => x.game_id)));
-  const wish = (selected ? wishlist.filter((w) => w.modeKey === selected) : wishlist).slice(0, 10);
+  const wish = wishlist.filter((w) => (!selected || w.modeKey === selected) && matchesView(w.game, view, prefs)).slice(0, 10);
 
   return (
     <Reveal className="space-y-8">
@@ -46,7 +52,7 @@ export default async function Discover(props: PageProps<"/recommendations">) {
           Reagier einfach auf die Vorschläge: „Eher nicht“ drückt Ähnliches nach unten, „Klingt gut“ zieht es hoch.
           Falsche Begründungen? Das stellst du unter <Link href="/profile" className="text-text underline decoration-line-strong underline-offset-4 hover:decoration-text">Geschmack</Link> ein.
         </p>
-        <PlatformScope platforms={user.platforms} />
+        <PlatformScope user={user} />
       </div>
 
       {modes.length > 0 && (
@@ -54,11 +60,12 @@ export default async function Discover(props: PageProps<"/recommendations">) {
           id="modes"
           active={selected ?? "mix"}
           items={[
-            { key: "mix", href: "/recommendations?mode=mix", label: "Mix", index: "00" },
-            ...modes.map((m, i) => ({ key: m.key, href: `/recommendations?mode=${encodeURIComponent(m.key)}`, label: m.name, index: String(i + 1).padStart(2, "0") })),
+            { key: "mix", href: href("mix", view), label: "Mix", index: "00" },
+            ...modes.map((m, i) => ({ key: m.key, href: href(m.key, view), label: m.name, index: String(i + 1).padStart(2, "0") })),
           ]}
         />
       )}
+      <PlatformFilter prefs={prefs} active={view} hrefFor={(p) => href(selected ?? "mix", p)} />
 
       <div data-reveal>
         <RecommendationRunner hasRecs={recs.length > 0} mode={selected} modeLabel={current ? current.name : "Mix aus allen Modi"} />
@@ -96,7 +103,12 @@ export default async function Discover(props: PageProps<"/recommendations">) {
                             {!selected && mode && <span className="eyebrow">{mode.name}</span>}
                             {r.is_wildcard && <span className="chip !border-accent/50 !text-accent">Wildcard</span>}
                             {r.via_family && <span className="chip !border-good/40 !text-good">In deiner Steam-Familie</span>}
-                            <PlatformBadges game={r.games} mine={user.platforms} />
+                            {reachOf(r.games, prefs) === "fallback" && (
+                              <span className="chip !border-accent/50 !text-accent" title="Läuft nicht auf deinen Hauptplattformen – empfohlen, weil es besonders gut passt">
+                                Nur {fallbackLabel(r.games, prefs)}
+                              </span>
+                            )}
+                            <PlatformBadges game={r.games} mine={prefs.primary} />
                           </div>
                           <Link href={`/games/${r.games.id}`} className="block font-display text-2xl font-semibold leading-tight hover:text-accent">
                             {r.games.title}
@@ -138,7 +150,9 @@ export default async function Discover(props: PageProps<"/recommendations">) {
         </section>
       ) : (
         <p className="py-6 text-center text-sm text-muted" data-reveal>
-          Für {current ? `„${current.name}“` : "den Mix"} gibt es noch keine Empfehlungen – generier die erste Runde.
+          {allRecs.length
+            ? "Keine der aktuellen Empfehlungen läuft auf dieser Plattform – Filter oben zurücksetzen oder neue Runde generieren."
+            : `Für ${current ? `„${current.name}“` : "den Mix"} gibt es noch keine Empfehlungen – generier die erste Runde.`}
         </p>
       )}
 
@@ -159,6 +173,11 @@ export default async function Discover(props: PageProps<"/recommendations">) {
                     {!current && w.modeKey && modeByKey.get(w.modeKey) && (
                       <div className="truncate text-xs text-muted">{modeByKey.get(w.modeKey)!.name}</div>
                     )}
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {reachOf(w.game, prefs) === "none" && <span className="text-[11px] text-bad">Läuft auf keiner deiner Plattformen</span>}
+                      {reachOf(w.game, prefs) === "fallback" && <span className="text-[11px] text-accent">Nur {fallbackLabel(w.game, prefs)}</span>}
+                      <PlatformBadges game={w.game} mine={prefs.primary} />
+                    </div>
                   </div>
                 </Link>
               </li>

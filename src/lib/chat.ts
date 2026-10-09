@@ -3,7 +3,7 @@ import { Type, type Content, type FunctionDeclaration, type Part } from "@google
 import { db, fetchAll, must, selectInChunks } from "./db";
 import { analyzeGame, upsertSteamGame } from "./games";
 import { chatStep, cosine, embed, parsePgVector, toPgVector } from "./gemini";
-import { normalizePlatforms, PLATFORM_COLUMNS, platformLabel, platformSummary, playableOn, type PlatformInfo } from "./platforms";
+import { PLATFORM_COLUMNS, platformLabel, platformSummary, prefsOf, reachOf, type PlatformInfo } from "./platforms";
 import type { Essence } from "./schemas";
 import { normalizeTitle, searchStore } from "./steam";
 import { compactEssence, getTasteProfile, markProfileStale, profileForPrompt } from "./taste";
@@ -130,8 +130,8 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         "games.hits",
       ) as (Pick<GameRow, "id" | "title" | "header_image" | "steam_appid"> & { essence: Essence } & PlatformInfo)[];
       // Nur, was auf den Plattformen der Person läuft
-      const platforms = normalizePlatforms(ctx.user.platforms);
-      hits = hits.filter((h) => playableOn(games.find((x) => x.id === h.game_id) ?? {}, platforms)).slice(0, 8);
+      const prefs = prefsOf(ctx.user);
+      hits = hits.filter((h) => reachOf(games.find((x) => x.id === h.game_id) ?? {}, prefs) !== "none").slice(0, 8);
       if (!hits.length) return { result: "Nichts Passendes, das auf den Plattformen der Person läuft." };
       const rel = must(
         await db()
@@ -153,6 +153,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
           status: r?.status ?? null,
           own_score: r?.score ?? null,
           platforms: platformSummary(g),
+          only_fallback_platform: reachOf(g, prefsOf(ctx.user)) === "fallback",
           essence: compactEssence(g.essence, 400),
         };
       });
@@ -171,12 +172,18 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       ) as (Pick<GameRow, "id" | "title" | "header_image" | "steam_appid" | "review_positive" | "review_negative"> & {
         essence: Essence;
       } & PlatformInfo)[];
-      const platforms = normalizePlatforms(ctx.user.platforms);
-      hits = hits.filter((h) => playableOn(games.find((x) => x.id === h.game_id) ?? {}, platforms)).slice(0, 8);
+      const prefs = prefsOf(ctx.user);
+      hits = hits.filter((h) => reachOf(games.find((x) => x.id === h.game_id) ?? {}, prefs) !== "none").slice(0, 8);
       return hits.map((h) => {
         const g = games.find((x) => x.id === h.game_id)!;
         remember(ctx, g);
-        return { title: g.title, match: Math.round(h.similarity * 100), platforms: platformSummary(g), essence: compactEssence(g.essence, 500) };
+        return {
+          title: g.title,
+          match: Math.round(h.similarity * 100),
+          platforms: platformSummary(g),
+          only_fallback_platform: reachOf(g, prefsOf(ctx.user)) === "fallback",
+          essence: compactEssence(g.essence, 500),
+        };
       });
     }
     case "lookup_game": {
@@ -246,12 +253,22 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
   }
 }
 
+function platformPromptLine(user: UserRow) {
+  const { primary, fallback } = prefsOf(user);
+  return [
+    `${user.display_name} spielt hauptsächlich auf: ${primary.map(platformLabel).join(", ")}.`,
+    fallback.length
+      ? `Notfalls, nur für besonders passende Spiele oder Deals, auch auf: ${fallback.map(platformLabel).join(", ")}. Solche Spiele (only_fallback_platform) nur empfehlen, wenn sie herausragend passen – und dann dazusagen.`
+      : "Empfiehl nur Spiele, die dort laufen.",
+    `Tool-Ergebnisse enthalten "platforms" (GFN = GeForce NOW; "über Epic" = bei GFN nur mit der Epic-Version).`,
+  ].join("\n");
+}
+
 function systemPrompt(user: UserRow, profileText: string | null) {
   return `Du bist "Compass", ein ehrlicher, begeisterungsfähiger Spiele-Berater für ${user.display_name}. Heute ist ${new Date().toLocaleDateString("de-DE")}.
 
 # Plattformen
-${user.display_name} spielt auf: ${normalizePlatforms(user.platforms).map((k) => platformLabel(k)).join(", ")}.
-Empfiehl nur Spiele, die dort laufen (Tool-Ergebnisse enthalten "platforms"; GFN = GeForce NOW, "über Epic" = dort nur mit Epic-Version).
+${platformPromptLine(user)}
 
 ${profileText ? `# Geschmacksprofil\n${profileText}` : "Es gibt noch kein Geschmacksprofil – frag nach Lieblingsspielen und was daran begeistert."}
 

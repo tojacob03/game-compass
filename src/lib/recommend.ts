@@ -6,7 +6,13 @@ import { enqueueAnalysis, upsertSteamGame } from "./games";
 import { cosine, generateJson, parsePgVector, toPgVector } from "./gemini";
 import { ensureGfnFresh } from "./gfn";
 import { buildPersonalScorer } from "./personal";
-import { normalizePlatforms, PLATFORM_COLUMNS, playableOn, type PlatformInfo } from "./platforms";
+import { fallbackLabel, platformLabel, PLATFORM_COLUMNS, prefsOf, reachOf, type PlatformInfo, type Reach } from "./platforms";
+
+/**
+ * Abzug (in z-Einheiten des Rankings) für Spiele, die nur auf einer Ausweich-Plattform laufen:
+ * Sie bleiben im Rennen, kommen aber nur bei klar überdurchschnittlicher Passung auf die Shortlist.
+ */
+const FALLBACK_PENALTY = 0.8;
 import { LateralProposalsSchema, RerankSchema, type Essence, type StoredTasteProfile } from "./schemas";
 import { HttpError } from "./session";
 import { getSteamSpy, getSteamSpyTag, normalizeTitle, searchStore } from "./steam";
@@ -368,7 +374,7 @@ export async function prepareRecommendations(user: UserRow, requestedMode: strin
 
   // Plattformen (Steam: Mac/Linux/Deck, NVIDIA: GeForce NOW) holen und nicht Spielbares aussortieren –
   // VOR der Analyse, damit kein KI-Kontingent für Spiele draufgeht, die die Person gar nicht spielen kann
-  const platforms = normalizePlatforms(user.platforms);
+  const prefs = prefsOf(user);
   await ensureGfnFresh().catch((e) => console.warn("GeForce NOW", e));
   await refreshMissingAssets([...sources.keys()]).catch((e) => console.warn("Assets", e));
   const allIds = [...sources.keys()];
@@ -380,7 +386,7 @@ export async function prepareRecommendations(user: UserRow, requestedMode: strin
           analysis_attempts: number;
         } & PlatformInfo)[])
       : []
-  ).filter((g) => playableOn(g, platforms));
+  ).filter((g) => reachOf(g, prefs) !== "none");
   const ids = status.map((g) => g.id);
 
   // Noch nicht analysierte Kandidaten: feste Quote pro Quelle, damit keine Quelle dominiert
@@ -440,6 +446,7 @@ type Candidate = {
   review_negative: number | null;
   essence: Essence;
   vector: number[];
+  reach: Reach;
 };
 
 /** Bewertet einen Kandidaten gegen Such-Facetten. Bewusst MAX statt Mittelwert -> kein "Geschmacks-Brei". */
@@ -494,12 +501,17 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
           .in("id", run.candidate_ids)
           .not("essence_embedding", "is", null),
         "games.candidates",
-      ) as (Omit<Candidate, "vector"> & { essence_embedding: unknown } & PlatformInfo)[])
+      ) as (Omit<Candidate, "vector" | "reach"> & { essence_embedding: unknown } & PlatformInfo)[])
     : [];
-  const platforms = normalizePlatforms(user.platforms);
+  const prefs = prefsOf(user);
+  const platformNote = new Map<string, string>();
   const candidates: Candidate[] = rows
-    .filter((r) => !known.gameIds.has(r.id) && playableOn(r, platforms))
-    .map((r) => ({ ...r, vector: parsePgVector(r.essence_embedding) ?? [] }));
+    .map((r) => {
+      const reach = reachOf(r, prefs);
+      if (reach === "fallback") platformNote.set(r.id, fallbackLabel(r, prefs));
+      return { ...r, reach, vector: parsePgVector(r.essence_embedding) ?? [] };
+    })
+    .filter((r) => !known.gameIds.has(r.id) && r.reach !== "none");
   if (!candidates.length) {
     await db().from("recommendation_runs").update({ status: "failed", error: "Keine Kandidaten" }).eq("id", runId);
     throw new HttpError(400, "Keine passenden Kandidaten gefunden. Synchronisiere deine Bibliothek und bewerte ein paar Spiele.");
@@ -528,7 +540,8 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
     const p = ranked.get(c.id)!;
     const src = run.candidate_sources[c.id] ?? [];
     const bonus = (friendNotes.has(c.id) ? 0.15 : 0) + (src.includes("llm") && src.length > 1 ? 0.1 : 0);
-    return { c, ...s, score: p.score + bonus, disliked: p.dislikedNeighbors, llmOnly: src.length === 1 && src[0] === "llm" };
+    const penalty = c.reach === "fallback" ? FALLBACK_PENALTY : 0;
+    return { c, ...s, score: p.score + bonus - penalty, disliked: p.dislikedNeighbors, llmOnly: src.length === 1 && src[0] === "llm" };
   });
   const byIntent = new Map<string, typeof scored>();
   for (const s of scored.sort((a, b) => b.score - a.score)) {
@@ -563,6 +576,9 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
       return [
         `[${idx + 1}] ${c.title}${c.release_year ? ` (${c.release_year})` : ""}${total ? ` – Steam ${Math.round(((c.review_positive ?? 0) / total) * 100)}% positiv, ${total} Reviews` : ""}`,
         `Passt am ehesten zu: Modus "${modeName.get(modeKey ?? "") ?? "?"}", Facette "${bestIntent}"`,
+        platformNote.has(c.id)
+          ? `PLATTFORM: läuft NICHT auf den Hauptplattformen (${prefs.primary.map(platformLabel).join(", ")}), nur auf ${platformNote.get(c.id)} – nur wählen, wenn außergewöhnlich passend, und in "risks" erwähnen.`
+          : "",
         similar.get(c.id)?.length ? `Ähnlichste eigene Spiele (Erlebnis): ${similar.get(c.id)!.map((x) => x.title).join(", ")}` : "",
         disliked.length ? `ACHTUNG – ähnelt Spielen, die die Person NICHT gepackt haben: ${disliked.map((x) => x.title).join(", ")}` : "",
         `Essenz: ${e.summary}`,
@@ -620,7 +636,8 @@ export async function finalizeRecommendations(user: UserRow, runId: string) {
 }
 
 /** Wunschliste nach Passung sortieren (Ähnlichkeit wird in der DB berechnet, keine KI-Kosten). */
-export async function rankWishlist(userId: string, platforms: string[] = []) {
+/** Ohne Plattform-Filter: Wunschliste ist eine bewusste Auswahl der Person – Plattformen zeigt die Seite als Marken. */
+export async function rankWishlist(userId: string) {
   const intents = await loadIntents(userId);
   if (!intents.length) return [];
   const ranked = must(
@@ -649,7 +666,7 @@ export async function rankWishlist(userId: string, platforms: string[] = []) {
   } & PlatformInfo)[];
   const byId = new Map(games.map((g) => [g.id, g]));
   return ranked
-    .filter((r) => byId.has(r.game_id) && playableOn(byId.get(r.game_id)!, platforms))
+    .filter((r) => byId.has(r.game_id))
     .map((r) => {
       const game = byId.get(r.game_id)!;
       const intent = intents[r.best_idx - 1];

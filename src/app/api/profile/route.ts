@@ -15,7 +15,11 @@ const Item = {
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("about"), aboutMe: z.string().trim().max(3000) }),
-  z.object({ action: z.literal("platforms"), platforms: z.array(z.enum(PLATFORM_KEYS as [string, ...string[]])).min(1).max(5) }),
+  z.object({
+    action: z.literal("platforms"),
+    platforms: z.array(z.enum(PLATFORM_KEYS as [string, ...string[]])).min(1).max(5),
+    fallback: z.array(z.enum(PLATFORM_KEYS as [string, ...string[]])).max(5).default([]),
+  }),
   z.object({ action: z.literal("correct"), ...Item, verdict: z.enum(["confirm", "reject"]) }),
   z.object({ action: z.literal("uncorrect"), ...Item }),
   z.object({ action: z.literal("weight"), ...Item, weight: z.number().int().min(1).max(5) }),
@@ -32,7 +36,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
     if (body.action === "platforms") {
-      must(await db().from("users").update({ platforms: [...new Set(body.platforms)] }).eq("id", user.id), "users.platforms");
+      const primary = [...new Set(body.platforms)];
+      const fallback = [...new Set(body.fallback)].filter((k) => !primary.includes(k));
+      must(await db().from("users").update({ platforms: primary, fallback_platforms: fallback }).eq("id", user.id), "users.platforms");
       await db().from("user_deals").delete().eq("user_id", user.id); // Deals für die neuen Plattformen neu berechnen
       return NextResponse.json({ ok: true });
     }

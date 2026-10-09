@@ -47,6 +47,44 @@ export function normalizePlatforms(v: unknown): PlatformKey[] {
 /** Nur Windows = keine Einschränkung (praktisch alles läuft dort). */
 export const isRestricted = (keys: readonly string[]) => !keys.includes("windows");
 
+/**
+ * Plattform-Vorlieben: Hauptplattformen (normal) und Ausweich-Plattformen (nur für besonders Passendes).
+ * Ein Spiel ist "primary", wenn es auf einer Hauptplattform läuft, "fallback", wenn nur auf einer Ausweich-Plattform,
+ * sonst "none" (taucht nirgends auf).
+ */
+export type PlatformPrefs = { primary: PlatformKey[]; fallback: PlatformKey[] };
+export type Reach = "primary" | "fallback" | "none";
+
+export function prefsOf(user: { platforms?: unknown; fallback_platforms?: unknown }): PlatformPrefs {
+  const primary = normalizePlatforms(user.platforms);
+  const fallback = (Array.isArray(user.fallback_platforms) ? user.fallback_platforms : []).filter(
+    (k): k is PlatformKey => PLATFORM_KEYS.includes(k as PlatformKey) && !primary.includes(k as PlatformKey),
+  );
+  return { primary, fallback };
+}
+
+export function reachOf(g: Partial<PlatformInfo>, prefs: PlatformPrefs): Reach {
+  if (playableOn(g, prefs.primary)) return "primary";
+  if (prefs.fallback.length && playableOn(g, prefs.fallback)) return "fallback";
+  return "none";
+}
+
+/** Ansichts-Filter: "main" = nur Hauptplattformen, sonst eine einzelne Plattform (strikt: unbekannt zählt nicht). */
+export type ViewFilter = "main" | PlatformKey;
+export function parseViewFilter(v: unknown): ViewFilter | null {
+  return v === "main" || PLATFORM_KEYS.includes(v as PlatformKey) ? (v as ViewFilter) : null;
+}
+export function matchesView(g: Partial<PlatformInfo>, f: ViewFilter | null, prefs: PlatformPrefs): boolean {
+  if (!f) return true;
+  if (f === "main") return reachOf(g, prefs) === "primary";
+  return supports(g, f) === true || (f === "windows" && supports(g, f) !== false);
+}
+
+/** Wo ein Ausweich-Spiel läuft – für Hinweise wie "Nur Windows-PC". */
+export function fallbackLabel(g: Partial<PlatformInfo>, prefs: PlatformPrefs): string {
+  return prefs.fallback.filter((k) => supports(g, k) !== false).map(platformLabel).join(" / ");
+}
+
 /** Kurzfassung für Prompts/Tools, z. B. "PC, Mac, Deck, GFN (über Epic)". */
 export function platformSummary(g: Partial<PlatformInfo>): string {
   if (!g.platforms_fetched_at && !g.gfn_store) return "unbekannt";

@@ -3,7 +3,7 @@ import { AnchorStrip } from "@/components/ModeCards";
 import { Reveal } from "@/components/ui/Reveal";
 import { BeamDot, TracingBeam } from "@/components/ui/TracingBeam";
 import { PlatformPicker } from "@/components/PlatformPicker";
-import { normalizePlatforms } from "@/lib/platforms";
+import { prefsOf } from "@/lib/platforms";
 import { AboutMeForm, EvalRunner, RebuildProfileButton } from "@/components/ProfileActions";
 import { AddFacet, FacetControls, RejectedList } from "@/components/ProfileCorrections";
 import { loadCorrections } from "@/lib/corrections";
@@ -44,11 +44,11 @@ export default async function Profile() {
         <div>
           <h2 className="h2">Worauf spielst du?</h2>
           <p className="text-sm text-muted">
-            Empfehlungen, Deals, Wunschliste und Chat zeigen nur Spiele, die auf mindestens einer dieser Plattformen laufen.
-            GeForce NOW laut offizieller NVIDIA-Liste, Steam Deck ab „spielbar“.
+            Empfehlungen, Deals und Chat richten sich danach. Was auf keiner deiner Plattformen läuft, taucht dort nicht auf – deine
+            Wunschliste bleibt immer vollständig. GeForce NOW laut offizieller NVIDIA-Liste, Steam Deck ab „spielbar“.
           </p>
         </div>
-        <PlatformPicker initial={normalizePlatforms(user.platforms)} />
+        <PlatformPicker initial={prefsOf(user)} />
       </section>
 
       {p && (

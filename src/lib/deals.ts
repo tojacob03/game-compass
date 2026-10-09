@@ -6,7 +6,10 @@ import { getBundles, getPrices, ItadError, itadConfigured, lookupSteamApps, STEA
 import { buildPersonalScorer } from "./personal";
 import { ensureGfnFresh } from "./gfn";
 import { refreshMissingAssets } from "./assets";
-import { normalizePlatforms, PLATFORM_COLUMNS, playableOn, type PlatformInfo } from "./platforms";
+import { PLATFORM_COLUMNS, prefsOf, reachOf, type PlatformInfo, type Reach } from "./platforms";
+
+/** Deals, die nur auf einer Ausweich-Plattform laufen, zählen weniger – nur richtig gute landen weit oben. */
+const FALLBACK_FACTOR = 0.6;
 import { loadIntents, scoreCandidate, wilson } from "./recommend";
 import { getTasteProfile } from "./taste";
 import type { UserRow } from "./types";
@@ -146,6 +149,7 @@ async function refreshBundles(games: GameInfo[], rows: Map<string, PriceRow>, co
 export type DealItem = {
   game: { id: string; title: string; capsule_image: string | null; header_image: string | null; steam_appid: number | null } & PlatformInfo;
   fit: number | null;
+  reach: Reach;
   modeKey: string | null;
   wishlisted: boolean;
   recommended: boolean;
@@ -216,6 +220,9 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
     .eq("user_id", user.id)
     .gte("created_at", new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString());
   const recommended = new Set(((recRows ?? []) as { game_id: string }[]).map((r) => r.game_id));
+  // Abgelehnte ("Eher nicht") und schon gespielte Empfehlungen nie als Deal zeigen – außer sie stehen auf der Wunschliste
+  const { data: fbRows } = await db().from("rec_feedback").select("game_id").eq("user_id", user.id).neq("verdict", "interested");
+  const rejected = new Set(((fbRows ?? []) as { game_id: string }[]).map((r) => r.game_id).filter((id) => !wishlist.has(id)));
 
   // Passung (0–100 = Perzentil im Katalog) mit demselben Ranking wie die Empfehlungen
   const fit = new Map<string, number>();
@@ -245,12 +252,12 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
   }
 
   const topCatalog = [...fit.entries()].sort((a, b) => b[1] - a[1]).slice(0, TOP_CATALOG).map(([id]) => id);
-  const wanted = [...new Set([...wishlist, ...recommended, ...topCatalog])].filter((id) => !owned.has(id));
+  const wanted = [...new Set([...wishlist, ...recommended, ...topCatalog])].filter((id) => !owned.has(id) && !rejected.has(id));
   const familyCount = wanted.filter((id) => family.has(id)).length;
   const candidateIds = wanted.filter((id) => !family.has(id)).slice(0, 300);
 
-  // Nur, was auf den Plattformen der Person läuft
-  const platforms = normalizePlatforms(user.platforms);
+  // Nur, was auf Haupt- oder Ausweich-Plattformen der Person läuft
+  const prefs = prefsOf(user);
   await ensureGfnFresh().catch((e) => console.warn("GeForce NOW", e));
   await refreshMissingAssets(candidateIds).catch((e) => console.warn("Assets", e));
   const games = (
@@ -263,7 +270,7 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
         }>,
       "deals.games",
     )
-  ).filter((g) => playableOn(g, platforms));
+  ).filter((g) => reachOf(g, prefs) !== "none");
 
   let error: string | undefined;
   const rows = new Map((await loadPriceRows(candidateIds)).map((r) => [r.game_id, r]));
@@ -293,7 +300,8 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
       (0.4 + 0.6 * (best.cut / 100)) *
       (atLow ? 1.2 : nearLow ? 1.08 : 1) *
       (wishlist.has(g.id) ? 1.12 : 1) *
-      (recommended.has(g.id) ? 1.06 : 1);
+      (recommended.has(g.id) ? 1.06 : 1) *
+      (reachOf(g, prefs) === "fallback" ? FALLBACK_FACTOR : 1);
     deals.push({
       game: {
         id: g.id,
@@ -309,6 +317,7 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
         platforms_fetched_at: g.platforms_fetched_at,
       },
       fit: f,
+      reach: reachOf(g, prefs),
       modeKey: modeOf.get(g.id) ?? null,
       wishlisted: wishlist.has(g.id),
       recommended: recommended.has(g.id),
@@ -353,7 +362,7 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
   });
 
   const updatedAt = [...rows.values()].reduce<string | null>((max, r) => (!max || r.fetched_at > max ? r.fetched_at : max), null);
-  return { configured: true, deals: deals.slice(0, 40), bundles: bundles.slice(0, 8), familyCount, checked: games.filter((g) => g.itad_id).length, updatedAt, error };
+  return { configured: true, deals: deals.slice(0, 80), bundles: bundles.slice(0, 8), familyCount, checked: games.filter((g) => g.itad_id).length, updatedAt, error };
 }
 
 function itadErrorMessage(e: unknown): string {

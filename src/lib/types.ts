@@ -6,7 +6,8 @@ export type UserRow = {
   status: "pending" | "active" | "blocked";
   is_admin: boolean;
   about_me: string | null;
-  platforms: string[]; // worauf die Person spielt (windows, mac, linux, deck, gfn)
+  platforms: string[]; // Hauptplattformen (windows, mac, linux, deck, gfn)
+  fallback_platforms: string[]; // nur für besonders passende Spiele/Deals
   last_synced_at: string | null;
   created_at: string;
 };
