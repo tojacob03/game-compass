@@ -2,7 +2,7 @@ import "server-only";
 import { db, fetchAll, must, selectInChunks } from "./db";
 import { env } from "./env";
 import { parsePgVector } from "./gemini";
-import { getBundles, getPrices, ItadError, itadConfigured, lookupSteamApps, STEAM_SHOP_ID, type ItadBundle, type ItadDeal, type Money } from "./itad";
+import { getBundles, getPrices, ItadError, itadBlockedFor, itadConfigured, lookupSteamApps, STEAM_SHOP_ID, type ItadBundle, type ItadDeal, type Money } from "./itad";
 import { buildPersonalScorer } from "./personal";
 import { ensureGfnFresh } from "./gfn";
 import { refreshMissingAssets } from "./assets";
@@ -19,7 +19,7 @@ const BUNDLE_TTL = 12 * 60 * 60 * 1000;
 /** So viele bestpassende Katalog-Spiele (zusätzlich zu Wunschliste + Empfehlungen) werden auf Angebote geprüft. */
 const TOP_CATALOG = 80;
 /** Für so viele Spiele werden Bundles geladen (je eine Anfrage, daher begrenzt). */
-const BUNDLE_LOOKUPS = 30;
+const BUNDLE_LOOKUPS = 20;
 
 type Deal = Pick<ItadDeal, "cut" | "url" | "expiry" | "voucher"> & { shop: string; shopId: number; price: Money; regular: Money };
 type PriceRow = {
@@ -121,14 +121,17 @@ async function refreshBundles(games: GameInfo[], rows: Map<string, PriceRow>, co
     return g.itad_id && r && (!r.bundles_fetched_at || Date.now() - Date.parse(r.bundles_fetched_at) > BUNDLE_TTL);
   });
   const now = new Date().toISOString();
-  await mapLimit(stale, 4, async (g) => {
+  let fetched = 0;
+  await mapLimit(stale, 2, async (g) => {
+    if (itadBlockedFor() > 0) return; // API bremst gerade – Rest beim nächsten Lauf
     let bundles: ItadBundle[] = [];
     try {
       bundles = await getBundles(g.itad_id!, country);
     } catch (e) {
-      console.warn("Bundles", g.title, e);
+      if (!(e instanceof ItadError && e.status === 429)) console.warn("Bundles", g.title, e instanceof Error ? e.message : e);
       return;
     }
+    fetched++;
     const stored: StoredBundle[] = bundles
       .filter((b) => !b.isMature && (!b.expiry || Date.parse(b.expiry) > Date.now()))
       .map((b) => ({
@@ -144,6 +147,7 @@ async function refreshBundles(games: GameInfo[], rows: Map<string, PriceRow>, co
     r.bundles_fetched_at = now;
     await db().from("game_prices").update({ bundles: stored, bundles_fetched_at: now }).eq("game_id", g.id);
   });
+  return fetched;
 }
 
 export type DealItem = {
@@ -168,8 +172,11 @@ export type BundleItem = {
   url: string;
   expiry: string | null;
   price: Money;
-  matched: { id: string; title: string; fit: number | null; regular: number | null }[];
+  /** wanted = auf der Wunschliste oder unter deinen Empfehlungen */
+  matched: { id: string; title: string; fit: number | null; regular: number | null; wanted: boolean }[];
+  /** Normalpreis aller passenden Spiele bzw. nur der gewünschten */
   value: number;
+  wantedValue: number;
 };
 
 export type DealsResult = {
@@ -331,7 +338,7 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
   }
   deals.sort((a, b) => b.score - a.score);
 
-  // Bundles mit mindestens zwei Spielen, die zu dir passen
+  // Bundles: mindestens zwei passende Spiele – oder ein gewünschtes Spiel deutlich unter Normalpreis
   const byItad = new Map(games.filter((g) => g.itad_id).map((g) => [g.itad_id!, g]));
   const seen = new Map<number, StoredBundle>();
   for (const r of rows.values()) for (const b of r.bundles ?? []) seen.set(b.id, b);
@@ -346,15 +353,17 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
         neededTier = Math.max(neededTier, ti);
         const pr = rows.get(g.id)?.deals;
         const regular = pr?.find((d) => d.shopId === STEAM_SHOP_ID)?.regular.amount ?? pr?.[0]?.regular.amount ?? null;
-        matched.push({ id: g.id, title: g.title, fit: fit.get(g.id) ?? null, regular });
+        matched.push({ id: g.id, title: g.title, fit: fit.get(g.id) ?? null, regular, wanted: wishlist.has(g.id) || recommended.has(g.id) });
       }),
     );
     // Stufen sind kumulativ: Wer eine Stufe kauft, bekommt alle darunter
     const price = neededTier >= 0 ? b.tiers[neededTier].price : null;
-    if (matched.length < 2 || !price) continue;
+    if (!price || !matched.length) continue;
     const value = matched.reduce((s, m) => s + (m.regular ?? 0), 0);
+    const wantedValue = matched.filter((m) => m.wanted).reduce((s, m) => s + (m.regular ?? 0), 0);
     if (value <= price.amount) continue;
-    bundles.push({ id: b.id, title: b.title, shop: b.shop, url: b.url, expiry: b.expiry, price, matched, value });
+    if (matched.length < 2 && wantedValue < 2 * price.amount) continue;
+    bundles.push({ id: b.id, title: b.title, shop: b.shop, url: b.url, expiry: b.expiry, price, matched, value, wantedValue });
   }
   bundles.sort((a, b) => {
     const q = (x: BundleItem) => (x.value / x.price.amount) * (x.matched.reduce((s, m) => s + (m.fit ?? 50), 0) / x.matched.length);
@@ -363,6 +372,44 @@ async function computeDeals(user: UserRow): Promise<DealsResult> {
 
   const updatedAt = [...rows.values()].reduce<string | null>((max, r) => (!max || r.fetched_at > max ? r.fetched_at : max), null);
   return { configured: true, deals: deals.slice(0, 80), bundles: bundles.slice(0, 8), familyCount, checked: games.filter((g) => g.itad_id).length, updatedAt, error };
+}
+
+/**
+ * Für den täglichen Hintergrund-Lauf: Bundles für ALLE Spiele von Wunschliste und Empfehlungen prüfen
+ * (die Seite selbst prüft aus Zeitgründen nur die bestpassenden). Gibt zurück, wie viele noch offen sind.
+ */
+export async function refreshWantedBundles(user: UserRow, deadline: number): Promise<number> {
+  const country = env().STEAM_COUNTRY;
+  const { data: wl } = await db().from("user_games").select("game_id").eq("user_id", user.id).eq("wishlisted", true).eq("owned", false);
+  const { data: rc } = await db()
+    .from("recommendations")
+    .select("game_id")
+    .eq("user_id", user.id)
+    .gte("created_at", new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString());
+  const ids = [...new Set([...(wl ?? []), ...(rc ?? [])].map((r) => (r as { game_id: string }).game_id))];
+  if (!ids.length) return 0;
+  const games = await selectInChunks<GameInfo>(
+    ids,
+    (chunk) =>
+      db().from("games").select(`id, title, steam_appid, itad_id, itad_checked_at, capsule_image, header_image, ${PLATFORM_COLUMNS}`).in("id", chunk) as unknown as PromiseLike<{
+        data: GameInfo[] | null;
+        error: { message: string } | null;
+      }>,
+    "bundles.games",
+  );
+  await ensureItadIds(games);
+  const rows = new Map((await loadPriceRows(ids)).map((r) => [r.game_id, r]));
+  await refreshPrices(games, rows, country);
+  const stale = games.filter((g) => {
+    const r = rows.get(g.id);
+    return g.itad_id && r && (!r.bundles_fetched_at || Date.now() - Date.parse(r.bundles_fetched_at) > BUNDLE_TTL);
+  });
+  // In Portionen, damit eine Etappe ins Zeitlimit passt; bei API-Sperre aufhören
+  let done = 0;
+  for (let i = 0; i < stale.length && Date.now() < deadline - 5_000 && itadBlockedFor() === 0; i += 20) {
+    done += await refreshBundles(stale.slice(i, i + 20), rows, country);
+  }
+  return Math.max(0, stale.length - done);
 }
 
 function itadErrorMessage(e: unknown): string {

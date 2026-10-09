@@ -1,6 +1,9 @@
 import { ArrowUpRight, Package } from "lucide-react";
 import Link from "next/link";
+import { NotifySettings } from "@/components/NotifySettings";
 import { PlatformBadges } from "@/components/PlatformBadges";
+import { mailConfigured } from "@/lib/mail";
+import { settingsOf } from "@/lib/notify";
 import { PlatformFilter, PlatformScope } from "@/components/PlatformScope";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
 import { fallbackLabel, matchesView, parseViewFilter, prefsOf, supports, type ViewFilter } from "@/lib/platforms";
@@ -58,6 +61,30 @@ export default async function Deals(props: PageProps<"/deals">) {
         </p>
         <PlatformScope user={user} />
       </div>
+
+      {typeof sp.mail === "string" && (
+        <p className={`text-sm ${sp.mail === "ungueltig" ? "text-bad" : "text-good"}`}>
+          {sp.mail === "bestaetigt"
+            ? "Adresse bestätigt – Benachrichtigungen sind an."
+            : sp.mail === "abgemeldet"
+              ? "Abgemeldet – du bekommst keine Benachrichtigungen mehr."
+              : "Der Link ist ungültig oder abgelaufen."}
+        </p>
+      )}
+
+      {result.configured && (
+        <details className="card group p-4" open={typeof sp.mail === "string" || undefined}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm">
+            <span className="font-medium">Per E-Mail benachrichtigen</span>
+            <span className="text-muted">
+              {user.email_verified_at && settingsOf(user).enabled ? `an · ${user.email}` : "aus"} <span className="inline-block transition group-open:rotate-180">▾</span>
+            </span>
+          </summary>
+          <div className="mt-4">
+            <NotifySettings mailReady={mailConfigured()} email={user.email} verified={!!user.email_verified_at} initial={settingsOf(user)} />
+          </div>
+        </details>
+      )}
 
       {!result.configured ? (
         <section className="card max-w-2xl space-y-3 p-5">
@@ -171,8 +198,11 @@ export default async function Deals(props: PageProps<"/deals">) {
           {result.bundles.length > 0 && filter === "alle" && (
             <section className="space-y-4">
               <div data-reveal>
-                <h2 className="h2">Bundles mit mehreren deiner Spiele</h2>
-                <p className="text-sm text-muted">Nur Bundles, in denen mindestens zwei Spiele stecken, die zu dir passen – Preis der nötigen Stufe gegen den Normalpreis dieser Spiele.</p>
+                <h2 className="h2">Bundles mit deinen Spielen</h2>
+                <p className="text-sm text-muted">
+                  Mindestens zwei passende Spiele – oder ein Spiel von Wunschliste/Empfehlungen für weniger als die Hälfte. Preis der nötigen
+                  Stufe gegen den Normalpreis dieser Spiele; hervorgehoben, was du dir gewünscht hast.
+                </p>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {result.bundles.map((b) => (
@@ -194,7 +224,7 @@ export default async function Deals(props: PageProps<"/deals">) {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {b.matched.map((m) => (
-                        <span key={m.id} className="chip">
+                        <span key={m.id} className={`chip ${m.wanted ? "!border-text/40 !text-text" : ""}`}>
                           {m.title}
                           {m.fit != null ? ` · ${m.fit}` : ""}
                         </span>

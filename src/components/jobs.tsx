@@ -7,7 +7,7 @@ import { postJson } from "@/lib/client";
 
 export type Job = {
   id: string;
-  kind: "analyze" | "profile" | "recommend";
+  kind: "analyze" | "profile" | "recommend" | "deals";
   mode_key: string | null;
   status: "queued" | "running" | "done" | "failed" | "cancelled";
   stage: string | null;
@@ -91,8 +91,8 @@ export function useLatestJob(kind: Job["kind"], mode?: string | null) {
   return jobs.find((j) => j.kind === kind && (kind !== "recommend" || (j.mode_key ?? null) === (mode ?? null)));
 }
 
-const KIND_LABEL: Record<Job["kind"], string> = { analyze: "KI-Analyse", profile: "Profil", recommend: "Empfehlungen" };
-const KIND_HREF: Record<Job["kind"], string> = { analyze: "/dashboard", profile: "/profile", recommend: "/recommendations" };
+const KIND_LABEL: Record<Job["kind"], string> = { analyze: "KI-Analyse", profile: "Profil", recommend: "Empfehlungen", deals: "Deal-Check" };
+const KIND_HREF: Record<Job["kind"], string> = { analyze: "/dashboard", profile: "/profile", recommend: "/recommendations", deals: "/deals" };
 
 /** Start-Knopf + Fortschritt für einen Job-Typ. */
 export function JobControl({

@@ -33,14 +33,50 @@ export type ItadBundle = {
 };
 
 export class ItadError extends Error {
-  constructor(public status: number, path: string) {
+  constructor(
+    public status: number,
+    path: string,
+    public retryAfterMs = 0,
+  ) {
     super(`IsThereAnyDeal ${status} für ${path}`);
   }
+}
+
+/**
+ * Gesperrt bis (nach einer 429-Antwort mit langer Wartezeit): weitere Anfragen schlagen sofort fehl,
+ * statt einzeln zu warten – sonst würde eine Seite minutenlang hängen.
+ */
+let blockedUntil = 0;
+export const itadBlockedFor = () => Math.max(0, blockedUntil - Date.now());
+
+/** Die API erlaubt 1000 Anfragen pro 5 Minuten (≈ 3,3/s) – wir bleiben mit ~2,8/s darunter (pro Server-Instanz). */
+const MIN_GAP_MS = 360;
+let nextSlot = 0;
+async function throttle() {
+  const now = Date.now();
+  const wait = Math.max(0, nextSlot - now);
+  nextSlot = Math.max(now, nextSlot) + MIN_GAP_MS;
+  if (wait) await new Promise((r) => setTimeout(r, wait));
 }
 
 export const itadConfigured = () => !!env().ITAD_API_KEY;
 
 async function itad<T>(path: string, init: { method?: "GET" | "POST"; query?: Record<string, string>; body?: unknown } = {}): Promise<T> {
+  try {
+    return await itadOnce<T>(path, init);
+  } catch (e) {
+    // Bei "zu viele Anfragen" mit kurzer Wartezeit einmal warten und wiederholen; lange Sperren sofort weitergeben
+    if (e instanceof ItadError && e.status === 429 && e.retryAfterMs <= 5000) {
+      await new Promise((r) => setTimeout(r, Math.max(e.retryAfterMs, 1000)));
+      return itadOnce<T>(path, init);
+    }
+    throw e;
+  }
+}
+
+async function itadOnce<T>(path: string, init: { method?: "GET" | "POST"; query?: Record<string, string>; body?: unknown }): Promise<T> {
+  if (itadBlockedFor() > 0) throw new ItadError(429, path, itadBlockedFor());
+  await throttle();
   const key = env().ITAD_API_KEY;
   if (!key) throw new Error("ITAD_API_KEY fehlt");
   const url = `${BASE}${path}${init.query ? `?${new URLSearchParams(init.query)}` : ""}`;
@@ -51,7 +87,11 @@ async function itad<T>(path: string, init: { method?: "GET" | "POST"; query?: Re
     signal: AbortSignal.timeout(15000),
     cache: "no-store",
   });
-  if (!res.ok) throw new ItadError(res.status, path);
+  if (!res.ok) {
+    const retryAfterMs = Number(res.headers.get("retry-after") ?? 0) * 1000;
+    if (res.status === 429 && retryAfterMs > 5000) blockedUntil = Date.now() + retryAfterMs;
+    throw new ItadError(res.status, path, retryAfterMs);
+  }
   return (await res.json()) as T;
 }
 

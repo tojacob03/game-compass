@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 }
 
 const Body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("start"), kind: z.enum(["analyze", "profile", "recommend"]), mode: z.string().max(60).nullable().optional() }),
+  z.object({ action: z.literal("start"), kind: z.enum(["analyze", "profile", "recommend", "deals"]), mode: z.string().max(60).nullable().optional() }),
   z.object({ action: z.literal("cancel"), jobId: z.uuid() }),
 ]);
 

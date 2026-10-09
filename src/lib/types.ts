@@ -8,6 +8,9 @@ export type UserRow = {
   about_me: string | null;
   platforms: string[]; // Hauptplattformen (windows, mac, linux, deck, gfn)
   fallback_platforms: string[]; // nur für besonders passende Spiele/Deals
+  email: string | null; // nur für Benachrichtigungen, erst nach Bestätigung genutzt
+  email_verified_at: string | null;
+  notify: Record<string, unknown> | null;
   last_synced_at: string | null;
   created_at: string;
 };

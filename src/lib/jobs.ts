@@ -4,6 +4,9 @@ import { db, must } from "./db";
 import { env } from "./env";
 import { processQueue } from "./games";
 import { RateLimitError } from "./gemini";
+import { refreshWantedBundles } from "./deals";
+import { itadBlockedFor } from "./itad";
+import { notifyUser } from "./notify";
 import { finalizeRecommendations, prepareRecommendations, runPendingCount } from "./recommend";
 import { HttpError } from "./session";
 import { buildTasteProfile, ensureLibraryFacts } from "./taste";
@@ -19,7 +22,7 @@ import { QuotaExceededError } from "./usage";
  * nimmt die nächste Fortschritts-Abfrage den Job wieder auf (siehe resumeStaleJobs).
  */
 
-export type JobKind = "analyze" | "profile" | "recommend";
+export type JobKind = "analyze" | "profile" | "recommend" | "deals";
 export type JobRow = {
   id: string;
   user_id: string;
@@ -220,6 +223,28 @@ async function runSliceInner(job: JobRow, user: UserRow, deadline: number): Prom
         return "done";
       }
       return "continue";
+    }
+
+    case "deals": {
+      // 1) Bundles für die ganze Wunschliste + alle Empfehlungen (in Portionen), 2) Treffer auswerten + Mail
+      await update(job.id, { stage: "Prüfe Bundles für Wunschliste und Empfehlungen …" });
+      const left = await refreshWantedBundles(user, deadline - 20_000);
+      if (left > 0) {
+        const blocked = itadBlockedFor();
+        // Pausiert die API, kurz warten (höchstens bis knapp vor Etappenende); nach max. 6 Etappen ohne die restlichen Bundles weiter
+        job.progress_done += 1;
+        await update(job.id, { progress_done: job.progress_done, message: blocked ? "IsThereAnyDeal bremst – geht gleich weiter" : `noch ${left} Spiele` });
+        if (job.progress_done < 6) {
+          if (blocked) await sleep(Math.min(blocked, Math.max(0, deadline - Date.now() - 2_000)));
+          return "continue";
+        }
+      }
+      if (Date.now() > deadline - 25_000) return "continue";
+      await update(job.id, { stage: "Suche besonders gute Angebote …", message: null });
+      const { bundles, deals } = await notifyUser(user);
+      const n = bundles.length + deals.length;
+      await finish(job.id, "done", { stage: n ? `${n} neue Treffer per Mail geschickt` : "Nichts Neues – keine Mail" });
+      return "done";
     }
 
     case "recommend": {

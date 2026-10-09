@@ -1,6 +1,12 @@
 import "server-only";
 import { z } from "zod";
 
+/** Optionaler Wert: leer -> undefined, Leerzeichen/Anführungszeichen außen weg. */
+const optionalSecret = z
+  .string()
+  .optional()
+  .transform((v) => v?.trim().replace(/^["']|["']$/g, "") || undefined);
+
 const schema = z.object({
   APP_URL: z.url(),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET muss mindestens 32 Zeichen haben"),
@@ -16,12 +22,16 @@ const schema = z.object({
   AI_DAILY_ANALYSIS_LIMIT: z.coerce.number().int().positive().default(600),
   STEAM_COUNTRY: z.string().length(2).default("DE"),
   // Optional: Deals (https://isthereanydeal.com/apps/my) und Empfehlungscode für Instant-Gaming-Links
-  ITAD_API_KEY: z
-    .string()
-    .optional()
-    // Leerzeichen und versehentlich mitkopierte Anführungszeichen entfernen
-    .transform((v) => v?.trim().replace(/^["']|["']$/g, "") || undefined),
+  ITAD_API_KEY: optionalSecret,
   INSTANT_GAMING_REF: z.string().default("gamer-81a1cce"),
+  // Optional: E-Mail-Benachrichtigungen per SMTP (z. B. Gmail mit App-Passwort)
+  SMTP_HOST: z.string().default("smtp.gmail.com"),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_USER: optionalSecret,
+  SMTP_PASS: optionalSecret,
+  MAIL_FROM: optionalSecret,
+  // Optional: schützt den täglichen Vercel-Cron (/api/cron/daily)
+  CRON_SECRET: optionalSecret,
 });
 
 let cached: z.infer<typeof schema> | null = null;
