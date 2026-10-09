@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { GroupForms, LeaveGroupButton } from "@/components/GroupForms";
 import { db, must } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -61,7 +62,11 @@ export default async function Groups() {
       <GroupForms />
       <p className="text-xs text-muted">
         Hinweis: Neue Freunde müssen sich zuerst mit Steam anmelden und vom Admin freigeschaltet werden, bevor sie einer Gruppe
-        beitreten können.
+        beitreten können. Für die Steam-Familie geht es auch ohne Anmeldung: unter{" "}
+        <Link href="/library?tab=family" className="underline hover:text-text">
+          Bibliothek → Steam-Familie
+        </Link>{" "}
+        Mitglieder per Steam-Profil, CSV oder einzeln eintragen.
       </p>
     </div>
   );

@@ -83,6 +83,22 @@ export async function getPlayerSummary(steamId: string): Promise<PlayerSummary |
   return data.response.players[0] ?? null;
 }
 
+/**
+ * Steam-Profil aus Eingabe auflösen: SteamID64, Profil-Link (/profiles/… oder /id/…) oder Profilname.
+ * null = nicht gefunden.
+ */
+export async function resolveSteamId(input: string): Promise<string | null> {
+  const v = input.trim();
+  const direct = /(?:^|\/profiles\/)(\d{17})(?:\/|$)/.exec(v);
+  if (direct) return direct[1];
+  const vanity = /\/id\/([^/?#]+)/.exec(v)?.[1] ?? (/^[A-Za-z0-9_-]{2,32}$/.test(v) ? v : null);
+  if (!vanity) return null;
+  const data = await getJson<{ response: { success: number; steamid?: string } }>(
+    `${API}/ISteamUser/ResolveVanityURL/v1/?key=${env().STEAM_API_KEY}&vanityurl=${encodeURIComponent(vanity)}`,
+  );
+  return data.response.success === 1 ? (data.response.steamid ?? null) : null;
+}
+
 export type OwnedGame = { appid: number; name: string; playtime_forever: number; rtime_last_played?: number };
 
 /** null = Profil/Spieldetails privat */

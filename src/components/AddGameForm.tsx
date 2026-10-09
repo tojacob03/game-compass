@@ -6,7 +6,7 @@ import { postJson } from "@/lib/client";
 
 type Hit = { appid: number; name: string; image: string };
 
-const PLATFORMS = ["PlayStation", "Xbox", "Switch", "GOG", "Epic", "Battle.net", "EA App", "Ubisoft", "Mobile", "Retro", "Sonstiges"];
+export const PLATFORMS = ["PlayStation", "Xbox", "Switch", "GOG", "Epic", "Battle.net", "EA App", "Ubisoft", "Mobile", "Retro", "Sonstiges"];
 
 export function AddGameForm() {
   const router = useRouter();

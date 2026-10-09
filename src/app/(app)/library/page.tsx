@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { AddGameForm } from "@/components/AddGameForm";
+import { FamilyManager } from "@/components/FamilyManager";
+import { SelfImport } from "@/components/GameListImport";
+import { familyGroupId, listFamilyMembers } from "@/lib/family";
 import { GameCard, ScoreBadge } from "@/components/GameCard";
 import { AnimatedTabs } from "@/components/ui/AnimatedTabs";
 import { Reveal } from "@/components/ui/Reveal";
@@ -51,6 +54,17 @@ export default async function Library(props: PageProps<"/library">) {
   const plat = PLATFORMS.some((p) => p.key === sp.p && p.key !== "windows") ? (sp.p as PlatformKey) : null;
   const href = (t: string, p: PlatformKey | null) => `/library?tab=${t}${q ? `&q=${encodeURIComponent(q)}` : ""}${p ? `&p=${p}` : ""}`;
   const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+
+  // Steam-Familie: Mitglieder ohne Konto + angemeldete Mitglieder (für die Verwaltung)
+  const familyMembers = tab === "family" ? await listFamilyMembers(user) : [];
+  let appMembers: string[] = [];
+  if (tab === "family") {
+    const gid = await familyGroupId(user);
+    if (gid) {
+      const { data } = await db().from("group_members").select("users(display_name)").eq("group_id", gid).neq("user_id", user.id);
+      appMembers = ((data ?? []) as unknown as { users: { display_name: string } }[]).map((r) => r.users.display_name);
+    }
+  }
 
   let rows: Row[] = [];
   if (tab === "family") {
@@ -132,15 +146,24 @@ export default async function Library(props: PageProps<"/library">) {
         .
       </p>
 
-      {tab === "other" && <AddGameForm />}
+      {tab === "other" && (
+        <div className="space-y-3">
+          <AddGameForm />
+          <SelfImport />
+        </div>
+      )}
       {tab === "family" && (
-        <p className="text-sm text-muted">
-          Spiele, die andere Mitglieder deiner Steam-Familien-Gruppe besitzen und du nicht. Hinweis: Nicht jedes Spiel ist auf
-          Steam für Family Sharing freigegeben.{" "}
-          <Link href="/groups" className="text-accent underline">
-            Gruppen verwalten
-          </Link>
-        </p>
+        <div className="space-y-3">
+          <FamilyManager members={familyMembers} appMembers={appMembers} />
+          <p className="text-xs text-muted">
+            Unten: Spiele der anderen, die du nicht selbst besitzt. Nicht jedes Spiel ist auf Steam für Family Sharing freigegeben.
+            Wer GameCompass selbst nutzt, kann per Einladungscode unter{" "}
+            <Link href="/groups" className="underline hover:text-text">
+              Gruppen
+            </Link>{" "}
+            beitreten – dann kommen die Spiele automatisch.
+          </p>
+        </div>
       )}
 
       {rows.length === 0 ? (
